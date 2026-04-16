@@ -1,0 +1,35 @@
+book:
+  title: "Forward Deployed Engineering 指南"
+  subtitle: "从现场问题发现到 AI 原生生产交付"
+  author: "Baohua"
+  version: "0.1.0"
+  language: "zh-CN"
+  description: "系统讲解 Forward Deployed Engineering 的知识、原理、技术生态、交付方法和实践案例。"
+
+# mdPress 在 chapters 为空时使用 SUMMARY.md 作为阅读顺序。
+chapters: []
+
+style:
+  theme: "technical"
+  page_size: "A4"
+  code_theme: "github"
+  line_height: 1.6
+  margin:
+    top: 25
+    bottom: 25
+    left: 22
+    right: 22
+
+output:
+  filename: "forward-deployed-engineering-guide"
+  formats:
+    - site
+    - html
+    - pdf
+    - epub
+  toc: true
+  toc_max_depth: 3
+  cover: true
+  header: true
+  footer: true
+  generate_bookmarks: true
