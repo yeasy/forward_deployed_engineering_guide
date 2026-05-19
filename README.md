@@ -1,10 +1,27 @@
-# 前言
+<div align="center">
+
+# 前线部署工程实践指南
+
+[![GitHub stars](https://img.shields.io/github/stars/yeasy/forward_deployed_engineering_guide?style=social)](https://github.com/yeasy/forward_deployed_engineering_guide)
+[![Online Reading](https://img.shields.io/badge/在线阅读-GitBook-brightgreen)](https://yeasy.gitbook.io/forward_deployed_engineering_guide/)
+
+> 从现场问题发现到 AI 原生生产交付，系统掌握前线部署工程的方法、工具与实践。
+
+<img src="cover-v2.png" width="360" alt="前线部署工程实践指南封面配图">
+
+</div>
+
+---
 
 ## 本书定位
 
 Forward Deployed Engineering，简称 FDE，本书译作“前线部署工程”。它不是传统售前、外包实施或一次性顾问交付，而是一种把工程师嵌入真实业务现场，用软件、数据、AI、平台和运营方法解决复杂组织问题的工程实践。FDE 的目标不是完成一份方案文档，而是把模糊问题转化为可运行、可观测、可治理、可持续演进的生产系统。
 
-Palantir 的 Forward Deployed Engineering 实践将 FDE 广泛带入行业视野。随着企业 AI 落地进入生产化阶段，FDE 被重新推到前台。OpenAI 宣布推出 [OpenAI Deployment Company](https://openai.com/index/openai-launches-the-deployment-company/)，强调让专门从事前沿 AI 部署的工程师嵌入组织，识别高影响场景，重构关键工作流，并把收益沉淀为可持续运行的系统。Palantir 也在 Foundry 文档中提供 [AI FDE](https://www.palantir.com/docs/foundry/ai-fde/overview)，用自然语言执行 Foundry 操作。Accenture 与 Microsoft 也宣布成立面向企业 AI 规模化的 [FDE 实践](https://newsroom.accenture.com/news/2026/accenture-launches-microsoft-forward-deployed-engineering-practice-to-help-organizations-scale-ai-across-the-enterprise)，说明 FDE 已从少数公司的组织实践扩展为企业 AI 和数字化转型的重要交付模式。
+FDE 已从少数公司的组织实践扩展为企业 AI 和数字化转型的重要交付模式：
+
+- Palantir 的 FDE 实践将这一角色带入行业视野，并在 Foundry 文档中提供 [AI FDE](https://www.palantir.com/docs/foundry/ai-fde/overview)。
+- OpenAI 推出 [OpenAI Deployment Company](https://openai.com/index/openai-launches-the-deployment-company/)，强调工程师嵌入组织、识别高影响场景、重构关键工作流。
+- Accenture 与 Microsoft 成立面向企业 AI 规模化的 [FDE 实践](https://newsroom.accenture.com/news/2026/accenture-launches-microsoft-forward-deployed-engineering-practice-to-help-organizations-scale-ai-across-the-enterprise)。
 
 本书面向希望系统掌握 FDE 的工程师、技术负责人、产品经理、解决方案架构师、平台工程师、AI 应用开发者和企业数字化负责人。
 
@@ -30,6 +47,23 @@ Palantir 的 Forward Deployed Engineering 实践将 FDE 广泛带入行业视野
 
 第四，掌握 AI 原生 FDE 实践。书中将覆盖 LLM、RAG、Agent、评测、LLMOps、提示工程、工具调用、模型部署、安全防护和人机协同边界，重点解释如何把 AI 能力接入客户数据、系统、权限和真实工作流。
 
+## 阅读路径
+
+| 读者 | 建议章节 | 阅读重点 |
+|---|---|---|
+| FDE / 解决方案工程师 | 1 -> 2 -> 3 -> 4 -> 11 -> 12 | 角色边界、现场发现、架构取舍、生产上线、运维闭环 |
+| 平台 / DevOps 工程师 | 5 -> 6 -> 8 -> 12 -> 13 | 云原生、GitOps、供应链安全、可观测性、平台化 |
+| AI 应用工程师 | 7 -> 9 -> 10 -> 11 -> 16 | 数据接入、RAG、Agent、评测、LLMOps、AI FDE |
+| 技术负责人 / 产品负责人 | 1 -> 4 -> 14 -> 15 -> 16 | 交付模式、行业案例、组织能力、长期价值 |
+
+## 相关图书
+
+- [Docker 从入门到实践](https://yeasy.gitbook.io/docker_practice/)：补齐容器、镜像、Compose、Kubernetes 等运行底座。
+- [大模型提示词工程指南](https://yeasy.gitbook.io/prompt_engineering_guide/)：补齐提示设计、任务拆解和提示评测基础。
+- [大模型上下文工程权威指南](https://yeasy.gitbook.io/context_engineering_guide/)：补齐 RAG、记忆、工具调用和上下文管理。
+- [智能体 Harness 工程指南](https://yeasy.gitbook.io/harness_engineering_guide/)：补齐 Agent 运行时、工具层、记忆、安全和可观测性。
+- [大模型安全权威指南](https://yeasy.gitbook.io/ai_security_guide/)：补齐提示注入、数据泄露、模型滥用和 AI 系统治理。
+
 ## 全书结构
 
 全书分为四部分，共十六章，另设附录。
@@ -44,30 +78,33 @@ Palantir 的 Forward Deployed Engineering 实践将 FDE 广泛带入行业视野
 
 附录包括术语表、参考文献和工具索引，便于读者在阅读过程中快速查阅。
 
+## 在线阅读
+
+可通过 GitBook 阅读在线版本：[前线部署工程实践指南](https://yeasy.gitbook.io/forward_deployed_engineering_guide/)。
+
 ## 本地阅读与构建
 
-本书使用 mdPress 支持本地阅读。安装 mdPress 后，在项目根目录执行：
+安装 mdPress：
+
+```bash
+brew tap yeasy/tap
+brew install mdpress
+```
+
+本地预览：
 
 ```bash
 mdpress serve .
 ```
 
-浏览器打开 `http://127.0.0.1:9000` 即可实时预览。需要生成便携离线文件时执行：
+构建静态站点、PDF 和 ePub：
+
+```bash
+mdpress build --format site,pdf,epub .
+```
+
+生成单文件 HTML：
 
 ```bash
 mdpress build --format html .
 ```
-
-需要同时生成静态站点、PDF、HTML 和 ePub 时执行：
-
-```bash
-mdpress build --format site,pdf,html,epub .
-```
-
-mdPress 会读取 `book.yaml` 中的书籍元数据、主题和输出设置；正文阅读顺序由 `SUMMARY.md` 维护。
-
-## 资料原则
-
-本书资料以写作和修订时可公开获取的信息为准。事实性内容优先引用官方文档、标准组织资料、开源项目文档、公司公开材料和综述论文。工具生态部分优先采用官方资料，例如 [Kubernetes 文档](https://kubernetes.io/docs/)、[OpenGitOps](https://opengitops.dev/)、[Argo CD 文档](https://argo-cd.readthedocs.io/)、[OpenTelemetry 文档](https://opentelemetry.io/docs/)、[NIST SSDF](https://csrc.nist.gov/pubs/sp/800/218/final)、[NIST 零信任架构](https://csrc.nist.gov/pubs/sp/800/207/final)、[SLSA](https://slsa.dev/spec/latest/)、[CISA SBOM](https://www.cisa.gov/sbom)、[OWASP 大语言模型应用安全风险](https://owasp.org/www-project-top-10-for-large-language-model-applications/) 等。
-
-对招聘趋势、公司案例和行业观点，本书会标注来源边界，避免把未经证实的市场叙事写成事实。招聘页、营销页、厂商价格页和 SaaS 文档属于高漂移来源，应以官方最新页面为准。对金融、国防、医疗等高敏行业案例，本书只引用公开可核验资料，并明确安全、合规和数据权限假设。
