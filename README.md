@@ -3,7 +3,9 @@
 # 前线部署工程实践指南
 
 [![GitHub stars](https://img.shields.io/github/stars/yeasy/forward_deployed_engineering_guide?style=social)](https://github.com/yeasy/forward_deployed_engineering_guide)
+[![Release](https://img.shields.io/github/release/yeasy/forward_deployed_engineering_guide.svg)](https://github.com/yeasy/forward_deployed_engineering_guide/releases)
 [![Online Reading](https://img.shields.io/badge/在线阅读-GitBook-brightgreen)](https://yeasy.gitbook.io/forward_deployed_engineering_guide/)
+[![PDF](https://img.shields.io/badge/PDF-下载-orange)](https://github.com/yeasy/forward_deployed_engineering_guide/releases/latest)
 
 > 从现场问题发现到 AI 原生生产交付，系统掌握前线部署工程的方法、工具与实践。
 
@@ -82,6 +84,12 @@ FDE 已从少数公司的组织实践扩展为企业 AI 和数字化转型的重
 
 可通过 GitBook 阅读在线版本：[前线部署工程实践指南](https://yeasy.gitbook.io/forward_deployed_engineering_guide/)。
 
+## 下载离线版本
+
+正式 PDF 版本可前往 [GitHub Releases](https://github.com/yeasy/forward_deployed_engineering_guide/releases/latest) 页面下载。
+
+默认分支自动更新的预览版可直接下载 [forward_deployed_engineering_guide.pdf](https://github.com/yeasy/forward_deployed_engineering_guide/releases/download/preview-pdf/forward_deployed_engineering_guide.pdf)。该文件会随主线更新覆盖，不代表正式发布版本。
+
 ## 本地阅读与构建
 
 安装 mdPress：
@@ -97,6 +105,12 @@ brew install mdpress
 mdpress serve .
 ```
 
+检查 Markdown 链接和代码块围栏：
+
+```bash
+python3 check_project_rules.py
+```
+
 构建静态站点、PDF 和 ePub：
 
 ```bash
@@ -108,3 +122,12 @@ mdpress build --format site,pdf,epub .
 ```bash
 mdpress build --format html .
 ```
+
+## CI 与发布
+
+本仓库配置 GitHub Actions：
+
+- `CI`：在 `main` 分支推送、Pull Request 和手动触发时运行 Markdown 项目检查并构建 PDF artifact。
+- `Update Preview PDF`：在 `main` 分支推送和手动触发时更新 `preview-pdf` 预览版 Release。
+- `Auto Release`：在 `v*` tag 推送或手动触发时构建正式 PDF，并在 tag 发布时上传到 GitHub Release。
+- `Dependabot auto-merge`：仅对 GitHub Actions 的低风险补丁和小版本更新启用自动合并，且要求目标分支已配置必需检查。

@@ -2,7 +2,7 @@ book:
   title: "前线部署工程实践指南"
   subtitle: "从现场问题发现到 AI 原生生产交付"
   author: "Baohua"
-  version: "0.1.0"
+  version: "0.2.0"
   language: "zh-CN"
   description: "系统讲解前线部署工程的生产化方法、技术底座、AI 原生实践和现场交付案例。"
 
