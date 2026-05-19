@@ -1,6 +1,6 @@
 ## 参考文献
 
-本参考文献按主题分组，优先列出正文中反复使用的基础来源。
+本参考文献按主题分组，优先列出正文中反复使用的基础来源。高漂移来源（岗位页、产品功能、价格、监管时间线、供应商案例、preview 能力）应在使用当天重新核验；供应商营销页只能证明其公开表述，不能单独证明收益或通用最佳实践。
 
 ### FDE 与企业 AI 部署
 
@@ -11,6 +11,7 @@
 5. [Palantir Ontology 概览](https://www.palantir.com/docs/foundry/ontology/overview)
 6. [Accenture 与 Microsoft FDE practice 公告](https://newsroom.accenture.com/news/2026/accenture-launches-microsoft-forward-deployed-engineering-practice-to-help-organizations-scale-ai-across-the-enterprise)
 7. [a16z Services-Led Growth](https://a16z.com/services-led-growth/)
+8. [Docker 从入门到实践](https://yeasy.gitbook.io/docker_practice/)
 
 ### 产品发现、工作流与交付管理
 
@@ -118,11 +119,13 @@
 16. [OpenAI Data controls in the platform](https://platform.openai.com/docs/guides/your-data)
 17. [OpenAI Agents SDK](https://platform.openai.com/docs/guides/agents-sdk/)
 18. [Model Context Protocol specification 2025-11-25](https://modelcontextprotocol.io/specification/2025-11-25)
-19. [Ragas Documentation](https://docs.ragas.io/)
-20. [promptfoo Documentation](https://www.promptfoo.dev/docs/intro/)
-21. [Langfuse Documentation](https://langfuse.com/docs)
-22. [Arize Phoenix Documentation](https://docs.arize.com/phoenix)
-23. [Braintrust Documentation](https://www.braintrust.dev/docs)
+19. [Model Context Protocol governance](https://modelcontextprotocol.io/community/governance)
+20. [Linux Foundation Agentic AI Foundation announcement](https://www.linuxfoundation.org/press/linux-foundation-announces-the-formation-of-the-agentic-ai-foundation)
+21. [Ragas Documentation](https://docs.ragas.io/)
+22. [promptfoo Documentation](https://www.promptfoo.dev/docs/intro/)
+23. [Langfuse Documentation](https://langfuse.com/docs)
+24. [Arize Phoenix Documentation](https://docs.arize.com/phoenix)
+25. [Braintrust Documentation](https://www.braintrust.dev/docs)
 
 ### 可观测性、SRE 与运维
 

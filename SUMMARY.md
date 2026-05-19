@@ -2,7 +2,7 @@
 
 * [前言](README.md)
 
-## 第一部分：理解 FDE
+## 第一部分：入门篇：理解 FDE
 
 * [第一章 FDE 的角色边界](01_role/README.md)
   * [1.1 FDE 为何出现](01_role/1.1_origin.md)
@@ -33,7 +33,7 @@
   * [4.5 知识转移与客户自治](04_delivery/4.5_enablement.md)
   * [本章小结](04_delivery/summary.md)
 
-## 第二部分：工程底座
+## 第二部分：工程篇：云原生与自动化交付
 
 * [第五章 云原生运行底座](05_cloud_native/README.md)
   * [5.1 容器与运行时](05_cloud_native/5.1_container.md)
@@ -66,7 +66,7 @@
   * [8.6 AI 系统的供应链与威胁](08_security/8.6_ai_security.md)
   * [本章小结](08_security/summary.md)
 
-## 第三部分：AI 原生实践
+## 第三部分：生产篇：AI 原生系统
 
 * [第九章 AI 原生 FDE](09_ai_native/README.md)
   * [9.1 企业 AI 落地的真实瓶颈](09_ai_native/9.1_bottleneck.md)
@@ -98,7 +98,7 @@
   * [12.6 成本可观测性与多租户归因](12_operations/12.6_cost.md)
   * [本章小结](12_operations/summary.md)
 
-## 第四部分：规模化与生态
+## 第四部分：实战篇：规模化与行业落地
 
 * [第十三章 工具生态与平台化](13_tooling/README.md)
   * [13.1 开发者门户与服务目录](13_tooling/13.1_portal.md)

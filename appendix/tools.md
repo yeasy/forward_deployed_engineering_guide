@@ -58,7 +58,7 @@
 
 ### AI Gateway 与模型路由
 
-[LiteLLM](https://docs.litellm.ai/)、[Portkey](https://portkey.ai/docs) 和云厂商模型网关能力可用于统一模型调用、限流、重试、成本标签、缓存、审计和供应商切换。FDE 在客户现场引入 AI gateway 时，应明确它是否处理敏感数据、是否记录 prompt、如何与现有身份系统和日志平台对接。
+[LiteLLM](https://docs.litellm.ai/)、[Portkey](https://portkey.ai/docs)、[Envoy AI Gateway](https://aigateway.envoyproxy.io/docs/)、[Kong AI Gateway](https://developer.konghq.com/ai-gateway/) 和云厂商模型网关能力可用于统一模型调用、限流、重试、成本标签、缓存、审计和供应商切换。FDE 在客户现场引入 AI gateway 时，应明确它是否处理敏感数据、是否记录 prompt、如何与现有身份系统和日志平台对接，以及是否能记录 provider/model 路由、fallback、guardrail 决策和成本归因字段。
 
 ### AI 平台与模型 API
 

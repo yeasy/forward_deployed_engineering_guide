@@ -150,7 +150,7 @@ ADR 是 Architecture Decision Record 的缩写，即架构决策记录。它用�
 
 ### MCP
 
-MCP 是 Model Context Protocol 的缩写，由 Anthropic 在 2024 年开源；本书固定引用 [Model Context Protocol 2025-11-25 规范](https://modelcontextprotocol.io/specification/2025-11-25)。它为 LLM 应用与外部数据源、工具之间定义了标准化接口，使工具可被支持 MCP 的客户端、host 或 agent 框架复用，而不必为每个模型 SDK 单独适配。
+MCP 是 Model Context Protocol 的缩写，由 Anthropic 在 2024 年开源；本书固定引用 [Model Context Protocol 2025-11-25 规范](https://modelcontextprotocol.io/specification/2025-11-25)。它为 LLM 应用与外部数据源、工具之间定义了标准化接口，使工具可被支持 MCP 的客户端、host 或 agent 框架复用，而不必为每个模型 SDK 单独适配。截至 2026-05-19，Linux Foundation 公开信息显示 MCP 已进入 Agentic AI Foundation；协议治理中立化不等于生产安全默认成立，MCP server 仍需按供应链资产和工具权限治理。
 
 ### Ontology
 
