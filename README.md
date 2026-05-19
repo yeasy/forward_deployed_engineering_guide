@@ -7,7 +7,7 @@
 
 > 从现场问题发现到 AI 原生生产交付，系统掌握前线部署工程的方法、工具与实践。
 
-<img src="cover-v2.png" width="360" alt="前线部署工程实践指南封面配图">
+<img src="cover.png" width="360" alt="前线部署工程实践指南封面配图">
 
 </div>
 
