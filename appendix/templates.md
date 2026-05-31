@@ -175,7 +175,7 @@ AI 功能上线时，要把 prompt、模型、检索、工具、评测和 trace 
 | 预算口径 | 月预算按自然月折算；日预算 = 月预算 / 当月天数；统一使用客户财务时区 |
 | 快速燃烧 | 1 小时内消耗超过日预算 5% 且高金额审批占比异常上升 |
 | 慢速燃烧 | 6 小时内消耗超过日预算 10%，进入工单排查 |
-| 归因维度 | tenant、feature、model_id、prompt_version、cache_hit、tool_name |
+| 归因维度 | tenant、feature、model_id、prompt_version、cache_hit、tool_name、sku/resource_type、session_or_container_id、storage_class |
 | 止血动作 | 降低 top-k、关闭低价值解释、切到低成本模型、转人工或暂停非关键批量任务 |
 | 禁止动作 | 不得为降成本关闭审计、权限过滤、红队回归或必要人工复核 |
 
@@ -184,11 +184,11 @@ AI 功能上线时，要把 prompt、模型、检索、工具、评测和 trace 
 | 字段 | 示例内容 |
 | --- | --- |
 | billing_period | `2025-05` |
-| 内部估算 | 按 trace 聚合 input/output/reasoning/cache token 与工具调用成本 |
+| 内部估算 | 按 trace 聚合 input/output/reasoning/cache token、search/grounding 调用、file/vector storage、code/container session、guardrail/eval 和人工复核成本 |
 | 供应商账单 | 按项目/API key/SKU/consumed units 聚合 |
 | 对账键 | provider_project、api_key_alias、tenant、feature、model_id、date |
 | 偏差阈值 | 超过 3% 进入排查；该阈值为本书教学假设 |
-| 偏差原因 | 汇率、缓存折扣、后置 SKU 调整、漏采 trace、重试计费 |
+| 偏差原因 | 汇率、缓存折扣、后置 SKU 调整、漏采 trace、重试计费、存储滞留、session 续期、search/grounding 或 guardrail/eval 调用未归因 |
 | 处理动作 | 修正单价表、补 trace 字段、调整预算看板或与供应商确认账单口径 |
 
 ### 价值证明卡
