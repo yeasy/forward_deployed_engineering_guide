@@ -46,7 +46,7 @@
 
 ### 向量检索与知识索引
 
-[Milvus](https://milvus.io/docs)、[Weaviate](https://weaviate.io/developers/weaviate)、[Qdrant](https://qdrant.tech/documentation/) 和 [pgvector](https://github.com/pgvector/pgvector) 可用于构建企业 RAG 的向量检索层。选型时不要只看 benchmark：还要看 ACL 过滤、元数据 schema、备份恢复、混合检索、重排、租户隔离和运维团队已有数据库能力。
+[Milvus](https://milvus.io/docs/overview.md)、[Weaviate](https://weaviate.io/developers/weaviate)、[Qdrant](https://qdrant.tech/documentation/) 和 [pgvector](https://github.com/pgvector/pgvector) 可用于构建企业 RAG 的向量检索层。选型时不要只看 benchmark：还要看 ACL 过滤、元数据 schema、备份恢复、混合检索、重排、租户隔离和运维团队已有数据库能力。
 
 ### 评测与回归
 

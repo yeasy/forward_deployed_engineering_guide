@@ -149,7 +149,7 @@
 7. [LlamaIndex 文档](https://developers.llamaindex.ai/python/framework/)
 8. [Ray 文档](https://docs.ray.io/)
 9. [MLflow 文档](https://mlflow.org/docs/latest/)
-10. [Milvus Documentation](https://milvus.io/docs)
+10. [Milvus Documentation](https://milvus.io/docs/overview.md)
 11. [Weaviate Documentation](https://weaviate.io/developers/weaviate)
 12. [Qdrant Documentation](https://qdrant.tech/documentation/)
 13. [pgvector](https://github.com/pgvector/pgvector)
