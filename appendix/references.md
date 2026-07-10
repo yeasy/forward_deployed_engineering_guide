@@ -190,7 +190,7 @@
 6. [Kubernetes Dynamic Resource Allocation](https://kubernetes.io/docs/concepts/scheduling-eviction/dynamic-resource-allocation/)
 7. [Kubernetes Image Volumes](https://kubernetes.io/docs/tasks/configure-pod-container/image-volumes/)
 8. [Apache Iceberg Schema Evolution](https://iceberg.apache.org/docs/latest/evolution/)
-9. [Apache Kafka Streams Documentation](https://kafka.apache.org/20/documentation/streams/)
+9. [Apache Kafka Streams Documentation](https://kafka.apache.org/41/documentation/streams/)
 10. [OpenTelemetry GenAI Semantic Conventions](https://github.com/open-telemetry/semantic-conventions-genai)
 11. [FinOps Unit Economics](https://www.finops.org/framework/capabilities/unit-economics/)
 12. [FinOps Anomaly Management](https://www.finops.org/framework/capabilities/anomaly-management/)

@@ -64,7 +64,7 @@
 
 [Claude / Anthropic API](https://docs.anthropic.com/) 提供 Claude 系列模型、工具调用和长上下文能力，可作为对内 agent、客户面应用与离线评测的统一入口。涉及医疗、隐私或受监管数据时，不应把 DPA/BAA 视为平台默认能力；应按 [Anthropic BAA 说明](https://support.claude.com/en/articles/8114513-business-associate-agreements-baa-for-commercial-customers)核对产品面、API 功能、HIPAA-ready 配置、ZDR 要求和第三方集成排除项。
 
-[Azure AI Foundry](https://learn.microsoft.com/azure/ai-foundry/) 在 Azure 上集成模型目录、agent、评测与责任 AI 工具，适合已在 Microsoft 生态、需要私网与合规审计的客户。
+[Microsoft Foundry](https://learn.microsoft.com/azure/ai-foundry/)（原 Azure AI Foundry，2025-11 更名）在 Azure 上集成模型目录、agent、评测与责任 AI 工具，适合已在 Microsoft 生态、需要私网与合规审计的客户。
 
 [Amazon Bedrock](https://docs.aws.amazon.com/bedrock/) 在 AWS 区域内提供多家模型托管、Guardrails、Knowledge Bases 与 Agents，对在 AWS 落地数据与权限的项目集成成本较低。
 
