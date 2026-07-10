@@ -80,7 +80,7 @@ FDE 已从少数公司的组织实践扩展为企业 AI 和数字化转型的重
 
 第四部分“实战篇：规模化与行业落地”讨论如何把一次交付变成可复用能力。它包括工具生态、行业案例、组织能力、职业发展和未来趋势。
 
-附录包括术语表、参考文献、工具索引和交付证据包模板，便于读者在阅读、审校和项目实践中快速查阅与复用。
+附录包括术语表、参考文献、工具索引、[交付证据包模板](appendix/templates.md)、[综合实战](appendix/capstone.md)和[第十四章声明账本](appendix/claim_ledger.md)，便于读者在阅读、审校和项目实践中快速查阅、验证与复用。
 
 ## 在线阅读
 
@@ -90,7 +90,7 @@ FDE 已从少数公司的组织实践扩展为企业 AI 和数字化转型的重
 
 正式 PDF 版本可前往 [GitHub Releases](https://github.com/yeasy/forward_deployed_engineering_guide/releases/latest) 页面下载。
 
-默认分支自动更新的预览版可直接下载 [forward_deployed_engineering_guide.pdf](https://github.com/yeasy/forward_deployed_engineering_guide/releases/download/preview-pdf/forward_deployed_engineering_guide.pdf)。该文件会随主线更新覆盖，不代表正式发布版本。
+默认分支自动更新的预览版可直接下载 [PDF](https://github.com/yeasy/forward_deployed_engineering_guide/releases/download/preview-pdf/forward_deployed_engineering_guide.pdf)、[单文件 HTML](https://github.com/yeasy/forward_deployed_engineering_guide/releases/download/preview-pdf/forward_deployed_engineering_guide.html)和 [SHA256SUMS](https://github.com/yeasy/forward_deployed_engineering_guide/releases/download/preview-pdf/SHA256SUMS)。这些文件会随主线更新覆盖，不代表正式发布版本；正式 tag 版本另带构建来源证明。
 
 ## 本地阅读与构建
 
@@ -119,17 +119,22 @@ python3 check_project_rules.py
 mdpress build --format site,pdf,epub .
 ```
 
-生成单文件 HTML：
+生成严格的单文件 HTML（需要 Pandoc 3.5、Chrome 和 Node.js）：
 
 ```bash
-mdpress build --format html .
+PUPPETEER_SKIP_DOWNLOAD=true npm ci --prefix tools/mermaid --ignore-scripts
+export PATH="$PWD/tools/mermaid/node_modules/.bin:$PATH"
+export CHROME_BIN="/path/to/chrome"
+python3 tools/render_mermaid.py --book-dir . --svg-out /tmp/fde-mermaid --strict
+python3 tools/build_html_reader.py --book-dir . --title "前线部署工程实践指南" \
+  --svg-dir /tmp/fde-mermaid --out forward_deployed_engineering_guide.html --strict
 ```
 
 ## CI 与发布
 
 本仓库配置 GitHub Actions：
 
-- `CI`：在 `main` 分支推送、Pull Request 和手动触发时运行 Markdown 项目检查并构建 PDF artifact。
-- `Update Preview PDF`：在 `main` 分支推送和手动触发时更新 `preview-pdf` 预览版 Release。
-- `Auto Release`：在 `v*` tag 推送时构建正式 PDF 并上传到 GitHub Release；手动触发主要用于验证和生成 artifact，不会自动写入正式 Release 资产。
+- `CI`：在 `main` 分支推送、Pull Request 和手动触发时运行测试与项目检查，构建并验证 PDF、单文件 HTML 和校验和。
+- `Update Preview Publications`：先在只读构建任务中生成并验证 PDF、HTML 和校验和，再由独立写入任务更新 `preview-pdf` 预览 Release。
+- `Auto Release`：在 `v*` tag 推送时构建 PDF、HTML 和校验和，由独立发布任务生成构建来源证明并上传 GitHub Release；手动触发只生成验证后的 artifact，不写正式 Release。
 - `Dependabot auto-merge`：仅对 GitHub Actions 的低风险补丁和小版本更新启用自动合并，且要求目标分支已配置必需检查。

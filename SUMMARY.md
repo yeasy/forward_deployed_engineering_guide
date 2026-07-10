@@ -138,3 +138,5 @@
   * [参考文献](appendix/references.md)
   * [工具索引](appendix/tools.md)
   * [交付证据包模板](appendix/templates.md)
+  * [综合实战：从 Discovery 到客户接管](appendix/capstone.md)
+  * [第十四章声明账本](appendix/claim_ledger.md)

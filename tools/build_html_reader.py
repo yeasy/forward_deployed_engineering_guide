@@ -8,23 +8,32 @@ scroll by default; JS (Safari, Documents app, etc.) upgrades to one-page-at-a-ti
 - TOC drawer: CSS checkbox hack (opens without JS); prev/next are static anchors
 - Images/CSS embedded (--embed-resources) -> one offline file
 """
-import argparse, os, re, subprocess, sys, posixpath
+import argparse, os, re, subprocess, sys, posixpath, tempfile
+from pathlib import Path
 
 def esc(s):  return s.replace("&","&amp;").replace("<","&lt;").replace(">","&gt;")
 def escattr(s): return s.replace("&","&amp;").replace('"',"&quot;").replace("<","&lt;")
 
 def parse_summary(book_dir):
+    root = Path(book_dir).resolve()
     items, seen = [], set()
-    with open(os.path.join(book_dir, "SUMMARY.md"), encoding="utf-8") as f:
+    with (root / "SUMMARY.md").open(encoding="utf-8") as f:
         for line in f:
             m = re.match(r'^##\s+(.+?)\s*$', line)
             if m: items.append(("part", m.group(1))); continue
             m = re.match(r'^(\s*)[-*]\s+\[(.*?)\]\(([^)]+?)\)', line)
             if m:
                 indent, title, path = m.group(1), m.group(2).strip(), m.group(3).strip()
-                if path.endswith(".md") and path not in seen and os.path.isfile(os.path.join(book_dir, path)):
-                    seen.add(path)
-                    items.append(("file", path, title, min(len(indent.replace("\t","  "))//2, 2)))
+                path = path.split("#", 1)[0]
+                if not path.endswith(".md"):
+                    continue
+                source = (root / path).resolve()
+                if root not in source.parents:
+                    raise ValueError(f"SUMMARY entry escapes book directory: {path}")
+                relative = source.relative_to(root).as_posix()
+                if relative not in seen and source.is_file():
+                    seen.add(relative)
+                    items.append(("file", relative, title, min(len(indent.replace("\t","  "))//2, 2)))
     return items
 
 def fix_inline_dollar(text):
@@ -169,10 +178,22 @@ def main():
     ap.add_argument("--title", required=True)
     ap.add_argument("--out", required=True)
     ap.add_argument("--svg-dir", required=True, help="dir with pre-rendered d-1.svg .. d-N.svg")
+    mode = ap.add_mutually_exclusive_group()
+    mode.add_argument("--strict", dest="strict", action="store_true", default=True)
+    mode.add_argument("--allow-fallback", dest="strict", action="store_false")
     a = ap.parse_args()
-    book_dir = os.path.abspath(a.book_dir)
+    book_dir = Path(a.book_dir).resolve()
+    out_path = Path(a.out).resolve()
+    svg_dir = Path(a.svg_dir).resolve()
+
+    if not book_dir.is_dir():
+        raise ValueError(f"book directory does not exist: {book_dir}")
+    if out_path in {book_dir / "SUMMARY.md", *book_dir.glob("*.md")}:
+        raise ValueError(f"output path would overwrite book source: {out_path}")
 
     items = parse_summary(book_dir)
+    if not any(item[0] == "file" for item in items):
+        raise ValueError("SUMMARY.md contains no readable Markdown entries")
     page_meta, path_to_id, pidc = [], {}, 0
     for it in items:
         if it[0] == "file":
@@ -185,25 +206,32 @@ def main():
     for it in items:
         if it[0] != "file": continue
         _, path, title, lvl = it
-        with open(os.path.join(book_dir, path), encoding="utf-8") as f: txt = f.read()
+        with (book_dir / path).open(encoding="utf-8") as f: txt = f.read()
         txt = process_file(txt, posixpath.dirname(path), mermaid_store, path_to_id)
         chunks.append(f'\n\nPGBKZZp{pi}ZZ\n\n{txt}\n\n'); pi += 1
     combined = "\n".join(chunks)
     print(f"  pages: {len(page_meta)}, mermaid blocks: {len(mermaid_store)}")
 
-    # load pre-rendered SVGs, namespace ids to avoid collisions; fall back to source on miss
+    # Load pre-rendered SVGs and namespace ids. Strict mode rejects every miss.
     svgs, missing = [], 0
     for i in range(len(mermaid_store)):
-        p = os.path.join(a.svg_dir, f"d-{i+1}.svg")
-        if os.path.isfile(p) and os.path.getsize(p) > 0:
-            s = open(p, encoding="utf-8").read()
+        p = svg_dir / f"d-{i+1}.svg"
+        if p.is_file() and p.stat().st_size > 0:
+            s = p.read_text(encoding="utf-8")
             j = s.find("<svg"); s = s[j:] if j > 0 else s
+            if "<svg" not in s:
+                missing += 1
+                svgs.append('<pre class="diagram-fallback">' + esc(mermaid_store[i]) + '</pre>')
+                continue
             s = s.replace("my-svg", f"mmd{i}")
             svgs.append(s)
         else:
             missing += 1
             svgs.append('<pre class="diagram-fallback">' + esc(mermaid_store[i]) + '</pre>')
-    if missing: print(f"  WARNING: {missing}/{len(mermaid_store)} diagrams failed to render -> showing source as fallback")
+    if missing and a.strict:
+        raise ValueError(f"missing Mermaid SVGs: {missing}/{len(mermaid_store)}")
+    if missing:
+        print(f"  WARNING: {missing}/{len(mermaid_store)} diagrams failed to render -> showing source as fallback")
 
     # sidebar TOC
     sb = ['<div class="toc-head">目录</div><ul>']; fi = 0
@@ -214,26 +242,30 @@ def main():
             sb.append(f'<li class="toc-link lvl{lvl}"><a data-target="{pidi}" href="#{pidi}">{esc(title)}</a></li>')
     sb.append('</ul>'); sidebar_html = "".join(sb)
 
-    tmp_md = os.path.join(book_dir, "_combined_tmp.md")
-    tpl = "/tmp/_book_template.html"; out_tmp = "/tmp/_book_out.html"
-    with open(tmp_md, "w", encoding="utf-8") as f: f.write(combined)
-    with open(tpl, "w", encoding="utf-8") as f: f.write(TEMPLATE)
-    cmd = ["pandoc", "_combined_tmp.md", "-f", "markdown", "-t", "html5",
-           "--standalone", "--embed-resources", "--mathml",
-           "--template", tpl, "--metadata", f"title={a.title}", "-o", out_tmp]
-    print("  running pandoc ...")
-    r = subprocess.run(cmd, cwd=book_dir, capture_output=True, text=True)
-    if os.path.exists(tmp_md): os.remove(tmp_md)
-    if r.returncode != 0:
-        print("PANDOC FAILED:\n", r.stderr[:4000]); sys.exit(1)
-
-    with open(out_tmp, encoding="utf-8") as f: html = f.read()
+    with tempfile.TemporaryDirectory(prefix="fde-reader-") as directory:
+        temporary = Path(directory)
+        tmp_md = temporary / "combined.md"
+        tpl = temporary / "template.html"
+        out_tmp = temporary / "reader.html"
+        tmp_md.write_text(combined, encoding="utf-8")
+        tpl.write_text(TEMPLATE, encoding="utf-8")
+        cmd = ["pandoc", str(tmp_md), "-f", "markdown", "-t", "html5",
+               "--standalone", "--embed-resources", "--mathml",
+               "--resource-path", str(book_dir),
+               "--template", str(tpl), "--metadata", f"title={a.title}", "-o", str(out_tmp)]
+        print("  running pandoc ...")
+        r = subprocess.run(cmd, cwd=book_dir, capture_output=True, text=True, check=False)
+        if r.returncode != 0:
+            raise RuntimeError(f"PANDOC FAILED: {(r.stderr or r.stdout)[:4000]}")
+        html = out_tmp.read_text(encoding="utf-8")
     # swap mermaid placeholders -> pre-rendered inline SVG (2nd pass catches any not in <p>)
     def mrepl(m): return f'<figure class="diagram">{svgs[int(m.group(1))]}</figure>'
     html = re.sub(r'<p>\s*MERMAIDZZ(\d+)ZZ\s*</p>', mrepl, html)
     html = re.sub(r'MERMAIDZZ(\d+)ZZ', mrepl, html)
     # split <main> into pages, append static prev/next nav per page
     mm = re.search(r'(<main id="content">)(.*?)(</main>)', html, flags=re.DOTALL)
+    if not mm:
+        raise RuntimeError("Pandoc output has no <main id=\"content\"> container")
     segs = re.split(r'<p>\s*PGBKZZ(p\d+)ZZ\s*</p>', mm.group(2))
     def navhtml(i):
         out = ['<nav class="pn-wrap">']
@@ -248,18 +280,30 @@ def main():
     pages_html = []
     for k in range(1, len(segs), 2):
         pid, seg = segs[k], segs[k+1]
-        idx = order_idx = [pm[0] for pm in page_meta].index(pid)
+        idx = [pm[0] for pm in page_meta].index(pid)
         pages_html.append(f'<section class="page" id="{pid}" data-title="{escattr(id_to_title[pid])}">{seg}{navhtml(idx)}</section>')
     new_main = mm.group(1) + '<div id="pages">' + "".join(pages_html) + '</div>' + mm.group(3)
     html = html[:mm.start()] + new_main + html[mm.end():]
     html = html.replace("<!--SIDEBAR-->", sidebar_html)
 
     leftover = len(re.findall(r'MERMAIDZZ\d+ZZ|PGBKZZ', html))
-    with open(a.out, "w", encoding="utf-8") as f: f.write(html)
-    size = os.path.getsize(a.out) / 1048576
-    n_svg = html.count('class="diagram"'); n_math = html.count('<math'); n_img = html.count('data:image')
+    n_svg = html.count('class="diagram"')
+    if leftover or len(pages_html) != len(page_meta) or (a.strict and n_svg != len(mermaid_store)):
+        raise RuntimeError(
+            f"reader completeness failure: pages={len(pages_html)}/{len(page_meta)}, "
+            f"Mermaid={n_svg}/{len(mermaid_store)}, placeholders={leftover}"
+        )
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    out_path.write_text(html, encoding="utf-8")
+    size = out_path.stat().st_size / 1048576
+    n_math = html.count('<math'); n_img = html.count('data:image')
     print(f"  pages: {len(pages_html)} | inline svg: {n_svg} | <math>: {n_math} | images: {n_img} | leftover: {leftover}")
-    print(f"  OUTPUT: {a.out}  ({size:.2f} MB)")
+    print(f"  OUTPUT: {out_path}  ({size:.2f} MB)")
+    return 0
 
 if __name__ == "__main__":
-    main()
+    try:
+        raise SystemExit(main())
+    except (OSError, RuntimeError, ValueError) as error:
+        print(f"HTML reader build failed: {error}", file=sys.stderr)
+        raise SystemExit(1)
