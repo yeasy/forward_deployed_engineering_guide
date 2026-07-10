@@ -26,7 +26,7 @@ class HtmlReaderTests(unittest.TestCase):
         (book / "b.md").write_text("# B\n\nDone.\n", encoding="utf-8")
         return book
 
-    def fake_pandoc(self, root: Path) -> Path:
+    def fake_pandoc(self, root: Path, *, call_marker: Path | None = None) -> Path:
         binary = root / "bin"
         binary.mkdir(exist_ok=True)
         pandoc = binary / "pandoc"
@@ -35,6 +35,8 @@ class HtmlReaderTests(unittest.TestCase):
                 f"""\
                 #!{sys.executable}
                 import pathlib, re, sys
+                call_marker={str(call_marker) if call_marker else None!r}
+                if call_marker: pathlib.Path(call_marker).write_text('called', encoding='utf-8')
                 args=sys.argv[1:]
                 source=pathlib.Path(args[0]).read_text(encoding='utf-8')
                 output=pathlib.Path(args[args.index('-o')+1])
@@ -47,6 +49,36 @@ class HtmlReaderTests(unittest.TestCase):
         )
         pandoc.chmod(0o755)
         return binary
+
+    def fake_nonzero_after_write_tools(
+        self, root: Path, *, fail_first_only: bool
+    ) -> tuple[Path, Path]:
+        binary = root / "bin"
+        binary.mkdir()
+        chrome = binary / "chrome"
+        chrome.write_text("", encoding="utf-8")
+        attempt = root / "mmdc-attempt"
+        mmdc = binary / "mmdc"
+        mmdc.write_text(
+            textwrap.dedent(
+                f"""\
+                #!{sys.executable}
+                import pathlib, re, sys
+                args=sys.argv[1:]; source=pathlib.Path(args[args.index('-i')+1]); output=pathlib.Path(args[args.index('-o')+1])
+                count=len(re.findall(r'```mermaid', source.read_text(encoding='utf-8')))
+                for index in range(1, count+1): output.with_name(f'{{output.stem}}-{{index}}.svg').write_text('<svg id="my-svg"></svg>', encoding='utf-8')
+                attempt=pathlib.Path({str(attempt)!r})
+                attempt_count=int(attempt.read_text()) if attempt.exists() else 0
+                attempt.write_text(str(attempt_count + 1), encoding='utf-8')
+                if {fail_first_only!r} is False or attempt_count == 0:
+                    print('renderer reported fatal error', file=sys.stderr)
+                    raise SystemExit(1)
+                """
+            ),
+            encoding="utf-8",
+        )
+        mmdc.chmod(0o755)
+        return binary, chrome
 
     def run_reader(self, book: Path, svg: Path, output: Path, binary: Path, *flags: str):
         env = os.environ.copy()
@@ -152,6 +184,114 @@ class HtmlReaderTests(unittest.TestCase):
             rendered = output.read_text(encoding="utf-8") if output.exists() else ""
             self.assertNotIn(marker, rendered)
 
+    def test_reader_rejects_every_embeddable_html_resource_before_pandoc(self):
+        variants = {
+            "script-src": '<script src="../outside.asset"></script>',
+            "source-src": '<source src="../outside.asset">',
+            "source-srcset": '<source srcset="../outside.asset 1x">',
+            "video-src": '<video src="../outside.asset"></video>',
+            "video-poster": '<video poster="../outside.asset"></video>',
+            "audio-src": '<audio src="../outside.asset"></audio>',
+            "object-data": '<object data="../outside.asset"></object>',
+            "embed-src": '<embed src="../outside.asset">',
+            "input-src": '<input type="image" src="../outside.asset">',
+            "link-stylesheet": '<link rel="stylesheet" href="../outside.asset">',
+            "svg-href": '<svg><image href="../outside.asset"/></svg>',
+            "svg-xlink": '<svg><image xlink:href="../outside.asset"/></svg>',
+            "style-attribute": '<div style="background:url(../outside.asset)">x</div>',
+            "style-block": '<style>.x { background: url("../outside.asset"); }</style>',
+        }
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            for name, body in variants.items():
+                with self.subTest(name=name):
+                    case = root / name
+                    case.mkdir()
+                    book = self.make_book(case)
+                    marker = f"FDE_OUTSIDE_RESOURCE_{name}"
+                    (case / "outside.asset").write_text(marker, encoding="utf-8")
+                    (book / "a.md").write_text(f"# A\n\n{body}\n", encoding="utf-8")
+                    svg = case / "svg"
+                    svg.mkdir()
+                    output = case / "reader.html"
+                    called = case / "pandoc-called"
+                    result = self.run_reader(
+                        book,
+                        svg,
+                        output,
+                        self.fake_pandoc(case, call_marker=called),
+                        "--strict",
+                    )
+                    self.assertNotEqual(result.returncode, 0)
+                    self.assertIn("outside book directory", result.stderr)
+                    self.assertFalse(called.exists(), "resource validation must precede Pandoc")
+                    rendered = output.read_text(encoding="utf-8") if output.exists() else ""
+                    self.assertNotIn(marker, rendered)
+
+    def test_script_resource_rejects_absolute_encoded_and_symlink_escapes(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            cases = ("absolute", "encoded", "symlink")
+            for name in cases:
+                with self.subTest(name=name):
+                    case = root / name
+                    case.mkdir()
+                    book = self.make_book(case)
+                    outside = case / "outside.js"
+                    marker = f"FDE_SCRIPT_ESCAPE_{name}"
+                    outside.write_text(marker, encoding="utf-8")
+                    if name == "absolute":
+                        target = str(outside)
+                    elif name == "encoded":
+                        target = "%2e%2e/outside.js"
+                    else:
+                        (book / "linked.js").symlink_to(outside)
+                        target = "linked.js"
+                    (book / "a.md").write_text(
+                        f'# A\n\n<script src="{target}"></script>\n', encoding="utf-8"
+                    )
+                    svg = case / "svg"
+                    svg.mkdir()
+                    output = case / "reader.html"
+                    called = case / "pandoc-called"
+                    result = self.run_reader(
+                        book,
+                        svg,
+                        output,
+                        self.fake_pandoc(case, call_marker=called),
+                        "--strict",
+                    )
+                    self.assertNotEqual(result.returncode, 0)
+                    self.assertIn("outside book directory", result.stderr)
+                    self.assertFalse(called.exists())
+                    rendered = output.read_text(encoding="utf-8") if output.exists() else ""
+                    self.assertNotIn(marker, rendered)
+
+    def test_ordinary_links_and_non_resource_link_rel_are_not_embedded_inputs(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            book = self.make_book(root)
+            (root / "outside.html").write_text("outside", encoding="utf-8")
+            (book / "a.md").write_text(
+                "# A\n\n[ordinary](../outside.html)\n\n"
+                '<a href="../outside.html">ordinary HTML link</a>\n\n'
+                '<link rel="canonical" href="../outside.html">\n',
+                encoding="utf-8",
+            )
+            svg = root / "svg"
+            svg.mkdir()
+            output = root / "reader.html"
+            called = root / "pandoc-called"
+            result = self.run_reader(
+                book,
+                svg,
+                output,
+                self.fake_pandoc(root, call_marker=called),
+                "--strict",
+            )
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertTrue(called.is_file())
+
     def test_output_cannot_overwrite_nested_published_source(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
@@ -247,6 +387,53 @@ class HtmlReaderTests(unittest.TestCase):
             self.assertFalse((output / "d-2.svg").exists())
             self.assertTrue((output / "d-3.svg").is_file())
             self.assertIn("[2]", result.stderr)
+
+    def test_strict_renderer_rejects_complete_output_from_nonzero_command(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            book = self.make_book(root)
+            binary, chrome = self.fake_nonzero_after_write_tools(
+                root, fail_first_only=False
+            )
+            output = root / "svg"
+            env = os.environ.copy()
+            env.update({"PATH": f"{binary}{os.pathsep}{env['PATH']}", "CHROME_BIN": str(chrome)})
+            result = subprocess.run(
+                [sys.executable, str(RENDERER), "--book-dir", str(book), "--svg-out", str(output), "--strict"],
+                cwd=ROOT,
+                env=env,
+                text=True,
+                capture_output=True,
+                check=False,
+            )
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("renderer reported fatal error", result.stderr)
+            self.assertIn("RENDERED 0/1", result.stdout)
+            self.assertFalse((output / "d-1.svg").exists())
+
+    def test_renderer_recovers_when_single_diagram_retry_succeeds(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            book = self.make_book(root)
+            binary, chrome = self.fake_nonzero_after_write_tools(
+                root, fail_first_only=True
+            )
+            output = root / "svg"
+            env = os.environ.copy()
+            env.update({"PATH": f"{binary}{os.pathsep}{env['PATH']}", "CHROME_BIN": str(chrome)})
+            result = subprocess.run(
+                [sys.executable, str(RENDERER), "--book-dir", str(book), "--svg-out", str(output), "--strict"],
+                cwd=ROOT,
+                env=env,
+                text=True,
+                capture_output=True,
+                check=False,
+            )
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertIn("renderer reported fatal error", result.stderr)
+            self.assertIn("RENDERED 1/1", result.stdout)
+            self.assertTrue((output / "d-1.svg").is_file())
+            self.assertEqual((root / "mmdc-attempt").read_text(), "2")
 
     def test_locked_mermaid_quadrant_quotes_non_ascii_labels(self):
         text = (ROOT / "02_discovery" / "2.4_scope.md").read_text(encoding="utf-8")

@@ -9,6 +9,7 @@ scroll by default; JS (Safari, Documents app, etc.) upgrades to one-page-at-a-ti
 - Images/CSS embedded (--embed-resources) -> one offline file
 """
 import argparse, html as html_lib, os, re, subprocess, sys, posixpath, tempfile
+from html.parser import HTMLParser
 from pathlib import Path
 from urllib.parse import unquote, urlsplit
 
@@ -43,19 +44,126 @@ REFERENCE_DEFINITION_RE = re.compile(
 )
 REFERENCE_IMAGE_RE = re.compile(r'!\[([^\]]*)\]\[([^\]]*)\]')
 SHORTCUT_IMAGE_RE = re.compile(r'!\[([^\]]+)\](?![\[(])')
-HTML_RESOURCE_TAG_RE = re.compile(
-    r'<(?:img|source|video|audio|object|embed|input|link)\b[^>]*>', re.I | re.S
+CSS_URL_RE = re.compile(
+    r'''url\(\s*(?:(?P<quote>["'])(?P<quoted>.*?)(?P=quote)|(?P<bare>[^)]*))\s*\)''',
+    re.I | re.S,
 )
-HTML_RESOURCE_ATTRIBUTE_RE = re.compile(
-    r'''\b(src|href|poster|data)\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>]+))''',
-    re.I,
-)
-HTML_SRCSET_RE = re.compile(
-    r'''\bsrcset\s*=\s*(?:"([^"]*)"|'([^']*)'|([^>\s]+))''', re.I
-)
+HTML_RESOURCE_ATTRIBUTES = {
+    "img": {"src", "srcset"},
+    "source": {"src", "srcset"},
+    "video": {"src", "poster"},
+    "audio": {"src"},
+    "script": {"src"},
+    "object": {"data"},
+    "embed": {"src"},
+    "input": {"src"},
+    "iframe": {"src"},
+    "track": {"src"},
+    "image": {"href", "xlink:href"},
+    "use": {"href", "xlink:href"},
+}
+RESOURCE_LINK_RELS = {
+    "stylesheet",
+    "icon",
+    "apple-touch-icon",
+    "mask-icon",
+    "manifest",
+    "preload",
+    "modulepreload",
+    "prefetch",
+}
 
 def normalize_reference_label(label):
     return " ".join(label.split()).casefold()
+
+def css_resource_targets(value):
+    for match in CSS_URL_RE.finditer(value):
+        target = match.group("quoted") if match.group("quote") else match.group("bare")
+        if target and target.strip():
+            yield target.strip()
+
+def srcset_resource_targets(value):
+    """Yield srcset URLs without splitting the comma inside a data URI."""
+    position, length = 0, len(value)
+    while position < length:
+        while position < length and (value[position].isspace() or value[position] == ","):
+            position += 1
+        if position >= length:
+            return
+        start = position
+        is_data = value[position : position + 5].casefold() == "data:"
+        while position < length and not value[position].isspace() and (
+            is_data or value[position] != ","
+        ):
+            position += 1
+        target = value[start:position]
+        ended_with_separator = target.endswith(",")
+        target = target.rstrip(",")
+        if target:
+            yield target
+        if ended_with_separator:
+            continue
+        depth = 0
+        while position < length:
+            char = value[position]
+            if char == "(":
+                depth += 1
+            elif char == ")" and depth:
+                depth -= 1
+            elif char == "," and depth == 0:
+                position += 1
+                break
+            position += 1
+
+class HTMLResourceTargetParser(HTMLParser):
+    def __init__(self):
+        super().__init__(convert_charrefs=True)
+        self.targets = []
+        self.style_depth = 0
+
+    def handle_starttag(self, tag, attrs):
+        self._handle_tag(tag, attrs)
+        if tag.casefold() == "style":
+            self.style_depth += 1
+
+    def handle_startendtag(self, tag, attrs):
+        self._handle_tag(tag, attrs)
+
+    def handle_endtag(self, tag):
+        if tag.casefold() == "style" and self.style_depth:
+            self.style_depth -= 1
+
+    def handle_data(self, data):
+        if self.style_depth:
+            self.targets.extend(css_resource_targets(data))
+
+    def _handle_tag(self, tag, attrs):
+        tag = tag.casefold()
+        normalized = [
+            (name.casefold(), value)
+            for name, value in attrs
+            if name and value is not None
+        ]
+        for name, value in normalized:
+            if name == "style":
+                self.targets.extend(css_resource_targets(value))
+
+        allowed = HTML_RESOURCE_ATTRIBUTES.get(tag, set())
+        if tag == "link":
+            rels = {
+                token.casefold()
+                for name, value in normalized
+                if name == "rel"
+                for token in value.split()
+            }
+            allowed = {"href"} if rels & RESOURCE_LINK_RELS else set()
+        for name, value in normalized:
+            if name not in allowed:
+                continue
+            if name == "srcset":
+                self.targets.extend(srcset_resource_targets(value))
+            else:
+                self.targets.append(value)
 
 def markdown_resource_targets(text):
     for match in INLINE_IMAGE_RE.finditer(text):
@@ -75,17 +183,10 @@ def markdown_resource_targets(text):
         if target:
             yield target
 
-    for tag in HTML_RESOURCE_TAG_RE.findall(text):
-        for match in HTML_RESOURCE_ATTRIBUTE_RE.finditer(tag):
-            yield next(value for value in match.groups()[1:] if value is not None)
-        for match in HTML_SRCSET_RE.finditer(tag):
-            value = next(value for value in match.groups() if value is not None)
-            if value.lstrip().lower().startswith("data:"):
-                yield value
-            else:
-                for candidate in value.split(","):
-                    if candidate.strip():
-                        yield candidate.strip().split()[0]
+    parser = HTMLResourceTargetParser()
+    parser.feed(text)
+    parser.close()
+    yield from parser.targets
 
 def resolve_local_resource(book_dir, source, raw_target):
     target = html_lib.unescape(raw_target.strip())
@@ -99,7 +200,7 @@ def resolve_local_resource(book_dir, source, raw_target):
         return None
     if scheme or parsed.netloc:
         raise ValueError(f"unsupported resource URI in {source.relative_to(book_dir)}: {raw_target}")
-    resource_path = Path(unquote(parsed.path))
+    resource_path = Path(unquote(parsed.path).replace("\\", "/"))
     if resource_path.is_absolute():
         raise ValueError(
             f"local resource outside book directory in {source.relative_to(book_dir)}: {raw_target}"
