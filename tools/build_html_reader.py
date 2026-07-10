@@ -8,8 +8,9 @@ scroll by default; JS (Safari, Documents app, etc.) upgrades to one-page-at-a-ti
 - TOC drawer: CSS checkbox hack (opens without JS); prev/next are static anchors
 - Images/CSS embedded (--embed-resources) -> one offline file
 """
-import argparse, os, re, subprocess, sys, posixpath, tempfile
+import argparse, html as html_lib, os, re, subprocess, sys, posixpath, tempfile
 from pathlib import Path
+from urllib.parse import unquote, urlsplit
 
 def esc(s):  return s.replace("&","&amp;").replace("<","&lt;").replace(">","&gt;")
 def escattr(s): return s.replace("&","&amp;").replace('"',"&quot;").replace("<","&lt;")
@@ -35,6 +36,97 @@ def parse_summary(book_dir):
                     seen.add(relative)
                     items.append(("file", relative, title, min(len(indent.replace("\t","  "))//2, 2)))
     return items
+
+INLINE_IMAGE_RE = re.compile(r'!\[[^\]]*\]\(\s*(<[^>\n]+>|[^\s)\n]+)')
+REFERENCE_DEFINITION_RE = re.compile(
+    r'^\s{0,3}\[([^\]]+)\]:\s*(<[^>\n]+>|[^\s]+)', re.MULTILINE
+)
+REFERENCE_IMAGE_RE = re.compile(r'!\[([^\]]*)\]\[([^\]]*)\]')
+SHORTCUT_IMAGE_RE = re.compile(r'!\[([^\]]+)\](?![\[(])')
+HTML_RESOURCE_TAG_RE = re.compile(
+    r'<(?:img|source|video|audio|object|embed|input|link)\b[^>]*>', re.I | re.S
+)
+HTML_RESOURCE_ATTRIBUTE_RE = re.compile(
+    r'''\b(src|href|poster|data)\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>]+))''',
+    re.I,
+)
+HTML_SRCSET_RE = re.compile(
+    r'''\bsrcset\s*=\s*(?:"([^"]*)"|'([^']*)'|([^>\s]+))''', re.I
+)
+
+def normalize_reference_label(label):
+    return " ".join(label.split()).casefold()
+
+def markdown_resource_targets(text):
+    for match in INLINE_IMAGE_RE.finditer(text):
+        yield match.group(1)
+
+    definitions = {
+        normalize_reference_label(match.group(1)): match.group(2)
+        for match in REFERENCE_DEFINITION_RE.finditer(text)
+    }
+    for match in REFERENCE_IMAGE_RE.finditer(text):
+        label = match.group(2) or match.group(1)
+        target = definitions.get(normalize_reference_label(label))
+        if target:
+            yield target
+    for match in SHORTCUT_IMAGE_RE.finditer(text):
+        target = definitions.get(normalize_reference_label(match.group(1)))
+        if target:
+            yield target
+
+    for tag in HTML_RESOURCE_TAG_RE.findall(text):
+        for match in HTML_RESOURCE_ATTRIBUTE_RE.finditer(tag):
+            yield next(value for value in match.groups()[1:] if value is not None)
+        for match in HTML_SRCSET_RE.finditer(tag):
+            value = next(value for value in match.groups() if value is not None)
+            if value.lstrip().lower().startswith("data:"):
+                yield value
+            else:
+                for candidate in value.split(","):
+                    if candidate.strip():
+                        yield candidate.strip().split()[0]
+
+def resolve_local_resource(book_dir, source, raw_target):
+    target = html_lib.unescape(raw_target.strip())
+    if target.startswith("<") and target.endswith(">"):
+        target = target[1:-1].strip()
+    if not target or target.startswith("#"):
+        return None
+    parsed = urlsplit(target)
+    scheme = parsed.scheme.lower()
+    if scheme in {"http", "https", "data"}:
+        return None
+    if scheme or parsed.netloc:
+        raise ValueError(f"unsupported resource URI in {source.relative_to(book_dir)}: {raw_target}")
+    resource_path = Path(unquote(parsed.path))
+    if resource_path.is_absolute():
+        raise ValueError(
+            f"local resource outside book directory in {source.relative_to(book_dir)}: {raw_target}"
+        )
+    resource = (source.parent / resource_path).resolve()
+    if resource != book_dir and book_dir not in resource.parents:
+        raise ValueError(
+            f"local resource outside book directory in {source.relative_to(book_dir)}: {raw_target}"
+        )
+    if not resource.is_file():
+        raise ValueError(
+            f"missing local resource in {source.relative_to(book_dir)}: {raw_target}"
+        )
+    return resource
+
+def validate_published_resources(book_dir, items):
+    resources = set()
+    for item in items:
+        if item[0] != "file":
+            continue
+        source = (book_dir / item[1]).resolve()
+        text = source.read_text(encoding="utf-8")
+        for target in markdown_resource_targets(text):
+            resource = resolve_local_resource(book_dir, source, target)
+            if resource:
+                resources.add(resource)
+    return resources
 
 def fix_inline_dollar(text):
     def repl(m):
@@ -183,17 +275,29 @@ def main():
     mode.add_argument("--allow-fallback", dest="strict", action="store_false")
     a = ap.parse_args()
     book_dir = Path(a.book_dir).resolve()
-    out_path = Path(a.out).resolve()
+    raw_out_path = Path(a.out).expanduser()
+    out_path = raw_out_path.resolve()
     svg_dir = Path(a.svg_dir).resolve()
 
     if not book_dir.is_dir():
         raise ValueError(f"book directory does not exist: {book_dir}")
-    if out_path in {book_dir / "SUMMARY.md", *book_dir.glob("*.md")}:
+    if raw_out_path.suffix.lower() != ".html" or out_path.suffix.lower() != ".html":
+        raise ValueError("output must be an independent .html file")
+    if out_path.is_dir():
+        raise ValueError("output must be an independent .html file")
+    markdown_sources = {path.resolve() for path in book_dir.rglob("*.md")}
+    if out_path in markdown_sources:
         raise ValueError(f"output path would overwrite book source: {out_path}")
 
     items = parse_summary(book_dir)
     if not any(item[0] == "file" for item in items):
         raise ValueError("SUMMARY.md contains no readable Markdown entries")
+    resources = validate_published_resources(book_dir, items)
+    published_sources = {
+        (book_dir / item[1]).resolve() for item in items if item[0] == "file"
+    }
+    if out_path in published_sources | resources:
+        raise ValueError(f"output path would overwrite published input: {out_path}")
     page_meta, path_to_id, pidc = [], {}, 0
     for it in items:
         if it[0] == "file":

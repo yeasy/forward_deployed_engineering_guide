@@ -93,6 +93,86 @@ class HtmlReaderTests(unittest.TestCase):
             self.assertNotEqual(escaped.returncode, 0)
             self.assertIn("escapes book directory", escaped.stderr)
 
+    def test_reader_rejects_local_resource_escapes_before_pandoc(self):
+        variants = {
+            "inline": "![outside](../outside.svg)\n",
+            "reference": "![outside][asset]\n\n[asset]: ../outside.svg\n",
+            "html": '<img src="../outside.svg" alt="outside">\n',
+            "absolute": None,
+        }
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            for name, body in variants.items():
+                with self.subTest(name=name):
+                    case = root / name
+                    case.mkdir()
+                    book = self.make_book(case)
+                    outside = case / "outside.svg"
+                    marker = f"FDE_OUTSIDE_MARKER_{name}"
+                    outside.write_text(
+                        f'<svg xmlns="http://www.w3.org/2000/svg"><text>{marker}</text></svg>',
+                        encoding="utf-8",
+                    )
+                    if body is None:
+                        body = f"![outside]({outside})\n"
+                    (book / "a.md").write_text(f"# A\n\n{body}", encoding="utf-8")
+                    svg = case / "svg"
+                    svg.mkdir()
+                    output = case / "reader.html"
+                    result = self.run_reader(
+                        book, svg, output, self.fake_pandoc(case), "--strict"
+                    )
+                    self.assertNotEqual(result.returncode, 0)
+                    self.assertIn("outside book directory", result.stderr)
+                    rendered = output.read_text(encoding="utf-8") if output.exists() else ""
+                    self.assertNotIn(marker, rendered)
+
+    def test_reader_rejects_symlinked_resource_escape(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            book = self.make_book(root)
+            outside = root / "outside.svg"
+            marker = "FDE_SYMLINK_ESCAPE_MARKER"
+            outside.write_text(
+                f'<svg xmlns="http://www.w3.org/2000/svg"><text>{marker}</text></svg>',
+                encoding="utf-8",
+            )
+            (book / "linked.svg").symlink_to(outside)
+            (book / "a.md").write_text(
+                "# A\n\n![outside](linked.svg)\n", encoding="utf-8"
+            )
+            svg = root / "svg"
+            svg.mkdir()
+            output = root / "reader.html"
+            result = self.run_reader(
+                book, svg, output, self.fake_pandoc(root), "--strict"
+            )
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("outside book directory", result.stderr)
+            rendered = output.read_text(encoding="utf-8") if output.exists() else ""
+            self.assertNotIn(marker, rendered)
+
+    def test_output_cannot_overwrite_nested_published_source(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            book = root / "book"
+            nested = book / "nested"
+            nested.mkdir(parents=True)
+            source = nested / "chapter.md"
+            marker = "NESTED_SOURCE_MUST_SURVIVE"
+            source.write_text(f"# Chapter\n\n{marker}\n", encoding="utf-8")
+            (book / "SUMMARY.md").write_text(
+                "* [Chapter](nested/chapter.md)\n", encoding="utf-8"
+            )
+            svg = root / "svg"
+            svg.mkdir()
+            result = self.run_reader(
+                book, svg, source, self.fake_pandoc(root), "--strict"
+            )
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("independent .html", result.stderr)
+            self.assertIn(marker, source.read_text(encoding="utf-8"))
+
     def test_mermaid_renderer_is_strict_and_source_safe(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
