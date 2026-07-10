@@ -2,12 +2,15 @@ from __future__ import annotations
 
 import importlib.util
 import os
+import shutil
 import subprocess
 import sys
 import tempfile
 import textwrap
 import unittest
 from pathlib import Path
+
+from tools import build_html_reader as reader
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -291,6 +294,121 @@ class HtmlReaderTests(unittest.TestCase):
             )
             self.assertEqual(result.returncode, 0, result.stderr)
             self.assertTrue(called.is_file())
+
+    def test_nested_resources_share_one_validation_and_rewrite_pipeline(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory).resolve()
+            book = root / "book"
+            chapter = book / "chapter"
+            assets = chapter / "assets"
+            assets.mkdir(parents=True)
+            source = chapter / "a.md"
+            names = (
+                "inline.png",
+                "reference.png",
+                "collapsed.png",
+                "shortcut.png",
+                "img.png",
+                "img-1.png",
+                "img-2.png",
+                "source.bin",
+                "video.bin",
+                "poster.png",
+                "audio.bin",
+                "script.js",
+                "object.bin",
+                "embed.bin",
+                "input.png",
+                "frame.html",
+                "track.vtt",
+                "svg-image.png",
+                "svg-use.svg",
+                "style.css",
+                "inline-style.png",
+                "block-style.png",
+            )
+            for name in names:
+                (assets / name).write_text(name, encoding="utf-8")
+            body = (
+                "![inline](assets/inline.png)\n"
+                "![reference][asset]\n\n[asset]: assets/reference.png\n"
+                "![collapsed][]\n\n[collapsed]: assets/collapsed.png\n"
+                "![shortcut]\n\n[shortcut]: assets/shortcut.png\n"
+                '<img src="assets/img.png" srcset="assets/img-1.png 1x, '
+                'data:image/png;base64,AAAA 2x, assets/img-2.png 3x">\n'
+                '<source src="assets/source.bin">\n'
+                '<video src="assets/video.bin" poster="assets/poster.png"></video>\n'
+                '<audio src="assets/audio.bin"></audio>\n'
+                '<script src="assets/script.js"></script>\n'
+                '<object data="assets/object.bin"></object>\n'
+                '<embed src="assets/embed.bin">\n'
+                '<input type="image" src="assets/input.png">\n'
+                '<iframe src="assets/frame.html"></iframe>\n'
+                '<track src="assets/track.vtt">\n'
+                '<svg><image href="assets/svg-image.png"/>'
+                '<use xlink:href="assets/svg-use.svg"></use>'
+                '<use href="#local-symbol"></use></svg>\n'
+                '<link rel="stylesheet" href="assets/style.css">\n'
+                '<div style="background:url(\'assets/inline-style.png\')">x</div>\n'
+                '<style>.x{background:url(assets/block-style.png)}</style>\n'
+                "[ordinary](../outside.html)\n"
+                "[ordinary reference][outside]\n\n[outside]: ../outside.html\n"
+                '<a href="../outside.html">ordinary</a>\n'
+                '<link rel="canonical" href="../outside.html">\n'
+                '<img src="https://example.com/remote.png">\n'
+                '<img src="data:image/png;base64,AAAA">\n'
+            )
+            source.write_text(body, encoding="utf-8")
+
+            rewritten, resources = reader.rewrite_published_resources(book, source, body)
+
+            self.assertEqual(resources, {path.resolve() for path in assets.iterdir()})
+            for name in names:
+                self.assertIn(f"chapter/assets/{name}", rewritten)
+            self.assertIn("data:image/png;base64,AAAA 2x", rewritten)
+            self.assertIn("https://example.com/remote.png", rewritten)
+            self.assertIn('href="#local-symbol"', rewritten)
+            self.assertIn("[ordinary](../outside.html)", rewritten)
+            self.assertIn("[outside]: ../outside.html", rewritten)
+            self.assertIn('<a href="../outside.html">ordinary</a>', rewritten)
+            self.assertIn('<link rel="canonical" href="../outside.html">', rewritten)
+
+    @unittest.skipUnless(shutil.which("pandoc"), "Pandoc is required for integration coverage")
+    def test_nested_resource_rewrite_controls_real_pandoc_input(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory).resolve()
+            book = root / "book"
+            chapter = book / "chapter"
+            chapter.mkdir(parents=True)
+            (book / "SUMMARY.md").write_text(
+                "* [Nested](chapter/a.md)\n", encoding="utf-8"
+            )
+            (book / "shared.js").write_text("SAFE_BOOK_MARKER", encoding="utf-8")
+            (root / "shared.js").write_text("OUTSIDE_BOOK_MARKER", encoding="utf-8")
+            (root / "outside.html").write_text("ordinary", encoding="utf-8")
+            (chapter / "a.md").write_text(
+                "# Nested\n\n"
+                '<script src="../shared.js"></script>\n\n'
+                "[ordinary](../../outside.html)\n",
+                encoding="utf-8",
+            )
+            svg = root / "svg"
+            svg.mkdir()
+            output = root / "reader.html"
+
+            result = self.run_reader(
+                book,
+                svg,
+                output,
+                Path(shutil.which("pandoc")).parent,
+                "--strict",
+            )
+
+            self.assertEqual(result.returncode, 0, result.stderr)
+            html = output.read_text(encoding="utf-8")
+            self.assertIn("SAFE_BOOK_MARKER", html)
+            self.assertNotIn("OUTSIDE_BOOK_MARKER", html)
+            self.assertRegex(html, r'href="\.\./\.\./outside\.html"')
 
     def test_output_cannot_overwrite_nested_published_source(self):
         with tempfile.TemporaryDirectory() as directory:

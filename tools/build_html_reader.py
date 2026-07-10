@@ -9,9 +9,10 @@ scroll by default; JS (Safari, Documents app, etc.) upgrades to one-page-at-a-ti
 - Images/CSS embedded (--embed-resources) -> one offline file
 """
 import argparse, html as html_lib, os, re, subprocess, sys, posixpath, tempfile
+from dataclasses import dataclass
 from html.parser import HTMLParser
 from pathlib import Path
-from urllib.parse import unquote, urlsplit
+from urllib.parse import quote, unquote, urlsplit
 
 def esc(s):  return s.replace("&","&amp;").replace("<","&lt;").replace(">","&gt;")
 def escattr(s): return s.replace("&","&amp;").replace('"',"&quot;").replace("<","&lt;")
@@ -73,17 +74,35 @@ RESOURCE_LINK_RELS = {
     "prefetch",
 }
 
+@dataclass(frozen=True)
+class ResourceToken:
+    start: int
+    end: int
+    target: str
+
+@dataclass(frozen=True)
+class HTMLAttribute:
+    name: str
+    start: int
+    end: int
+    value: str
+
 def normalize_reference_label(label):
     return " ".join(label.split()).casefold()
 
-def css_resource_targets(value):
+def css_resource_tokens(value, offset=0):
     for match in CSS_URL_RE.finditer(value):
-        target = match.group("quoted") if match.group("quote") else match.group("bare")
-        if target and target.strip():
-            yield target.strip()
+        group = "quoted" if match.group("quote") else "bare"
+        start, end = match.span(group)
+        if group == "bare":
+            raw = value[start:end]
+            start += len(raw) - len(raw.lstrip())
+            end -= len(raw) - len(raw.rstrip())
+        if start < end:
+            yield ResourceToken(offset + start, offset + end, value[start:end])
 
-def srcset_resource_targets(value):
-    """Yield srcset URLs without splitting the comma inside a data URI."""
+def srcset_resource_tokens(value, offset=0):
+    """Yield positioned srcset URLs without splitting a data URI comma."""
     position, length = 0, len(value)
     while position < length:
         while position < length and (value[position].isspace() or value[position] == ","):
@@ -96,13 +115,8 @@ def srcset_resource_targets(value):
             is_data or value[position] != ","
         ):
             position += 1
-        target = value[start:position]
-        ended_with_separator = target.endswith(",")
-        target = target.rstrip(",")
-        if target:
-            yield target
-        if ended_with_separator:
-            continue
+        if start < position:
+            yield ResourceToken(offset + start, offset + position, value[start:position])
         depth = 0
         while position < length:
             char = value[position]
@@ -115,11 +129,60 @@ def srcset_resource_targets(value):
                 break
             position += 1
 
-class HTMLResourceTargetParser(HTMLParser):
-    def __init__(self):
-        super().__init__(convert_charrefs=True)
-        self.targets = []
+def html_attributes(raw_tag, offset):
+    position, length = 1, len(raw_tag)
+    while position < length and not raw_tag[position].isspace() and raw_tag[position] not in "/>":
+        position += 1
+    while position < length:
+        while position < length and raw_tag[position].isspace():
+            position += 1
+        if position >= length or raw_tag[position] in "/>":
+            return
+        name_start = position
+        while position < length and not raw_tag[position].isspace() and raw_tag[position] not in "=/>":
+            position += 1
+        name = raw_tag[name_start:position].casefold()
+        while position < length and raw_tag[position].isspace():
+            position += 1
+        if position >= length or raw_tag[position] != "=":
+            continue
+        position += 1
+        while position < length and raw_tag[position].isspace():
+            position += 1
+        if position >= length:
+            return
+        if raw_tag[position] in "\"'":
+            quote_char = raw_tag[position]
+            position += 1
+            value_start = position
+            while position < length and raw_tag[position] != quote_char:
+                position += 1
+            value_end = position
+            if position < length:
+                position += 1
+        else:
+            value_start = position
+            while position < length and not raw_tag[position].isspace() and raw_tag[position] != ">":
+                position += 1
+            value_end = position
+        yield HTMLAttribute(
+            name,
+            offset + value_start,
+            offset + value_end,
+            raw_tag[value_start:value_end],
+        )
+
+class HTMLResourceTokenParser(HTMLParser):
+    def __init__(self, text):
+        super().__init__(convert_charrefs=False)
+        self.tokens = []
         self.style_depth = 0
+        self.line_offsets = [0]
+        self.line_offsets.extend(match.end() for match in re.finditer("\n", text))
+
+    def absolute_position(self):
+        line, column = self.getpos()
+        return self.line_offsets[line - 1] + column
 
     def handle_starttag(self, tag, attrs):
         self._handle_tag(tag, attrs)
@@ -135,58 +198,69 @@ class HTMLResourceTargetParser(HTMLParser):
 
     def handle_data(self, data):
         if self.style_depth:
-            self.targets.extend(css_resource_targets(data))
+            self.tokens.extend(css_resource_tokens(data, self.absolute_position()))
 
     def _handle_tag(self, tag, attrs):
         tag = tag.casefold()
-        normalized = [
-            (name.casefold(), value)
-            for name, value in attrs
-            if name and value is not None
-        ]
-        for name, value in normalized:
-            if name == "style":
-                self.targets.extend(css_resource_targets(value))
+        raw_tag = self.get_starttag_text()
+        if not raw_tag:
+            return
+        attributes = list(html_attributes(raw_tag, self.absolute_position()))
+        for attribute in attributes:
+            if attribute.name == "style":
+                self.tokens.extend(
+                    css_resource_tokens(attribute.value, attribute.start)
+                )
 
         allowed = HTML_RESOURCE_ATTRIBUTES.get(tag, set())
         if tag == "link":
             rels = {
                 token.casefold()
-                for name, value in normalized
-                if name == "rel"
-                for token in value.split()
+                for attribute in attributes
+                if attribute.name == "rel"
+                for token in html_lib.unescape(attribute.value).split()
             }
             allowed = {"href"} if rels & RESOURCE_LINK_RELS else set()
-        for name, value in normalized:
-            if name not in allowed:
+        for attribute in attributes:
+            if attribute.name not in allowed:
                 continue
-            if name == "srcset":
-                self.targets.extend(srcset_resource_targets(value))
+            if attribute.name == "srcset":
+                self.tokens.extend(
+                    srcset_resource_tokens(attribute.value, attribute.start)
+                )
             else:
-                self.targets.append(value)
+                self.tokens.append(
+                    ResourceToken(
+                        attribute.start, attribute.end, attribute.value
+                    )
+                )
 
-def markdown_resource_targets(text):
+def markdown_resource_tokens(text):
+    tokens = []
     for match in INLINE_IMAGE_RE.finditer(text):
-        yield match.group(1)
+        tokens.append(ResourceToken(*match.span(1), match.group(1)))
 
-    definitions = {
-        normalize_reference_label(match.group(1)): match.group(2)
-        for match in REFERENCE_DEFINITION_RE.finditer(text)
-    }
+    definitions = {}
+    for match in REFERENCE_DEFINITION_RE.finditer(text):
+        definitions.setdefault(
+            normalize_reference_label(match.group(1)),
+            ResourceToken(*match.span(2), match.group(2)),
+        )
     for match in REFERENCE_IMAGE_RE.finditer(text):
         label = match.group(2) or match.group(1)
-        target = definitions.get(normalize_reference_label(label))
-        if target:
-            yield target
+        token = definitions.get(normalize_reference_label(label))
+        if token:
+            tokens.append(token)
     for match in SHORTCUT_IMAGE_RE.finditer(text):
-        target = definitions.get(normalize_reference_label(match.group(1)))
-        if target:
-            yield target
+        token = definitions.get(normalize_reference_label(match.group(1)))
+        if token:
+            tokens.append(token)
 
-    parser = HTMLResourceTargetParser()
+    parser = HTMLResourceTokenParser(text)
     parser.feed(text)
     parser.close()
-    yield from parser.targets
+    tokens.extend(parser.tokens)
+    return sorted(set(tokens), key=lambda token: (token.start, token.end))
 
 def resolve_local_resource(book_dir, source, raw_target):
     target = html_lib.unescape(raw_target.strip())
@@ -216,18 +290,57 @@ def resolve_local_resource(book_dir, source, raw_target):
         )
     return resource
 
-def validate_published_resources(book_dir, items):
+def canonical_resource_target(book_dir, raw_target, resource):
+    target = html_lib.unescape(raw_target.strip())
+    if target.startswith("<") and target.endswith(">"):
+        target = target[1:-1].strip()
+    parsed = urlsplit(target)
+    canonical = quote(resource.relative_to(book_dir).as_posix(), safe="/")
+    if parsed.query:
+        canonical += f"?{parsed.query}"
+    if parsed.fragment:
+        canonical += f"#{parsed.fragment}"
+    return canonical
+
+def rewrite_published_resources(book_dir, source, text):
+    book_dir = Path(book_dir).resolve()
+    source = Path(source).resolve()
+    resources = set()
+    replacements = []
+    for token in markdown_resource_tokens(text):
+        resource = resolve_local_resource(book_dir, source, token.target)
+        if resource:
+            resources.add(resource)
+            replacements.append(
+                (
+                    token.start,
+                    token.end,
+                    canonical_resource_target(book_dir, token.target, resource),
+                )
+            )
+    rewritten = text
+    next_start = len(text)
+    for start, end, replacement in reversed(replacements):
+        if end > next_start:
+            raise ValueError(f"overlapping resource tokens in {source.relative_to(book_dir)}")
+        rewritten = rewritten[:start] + replacement + rewritten[end:]
+        next_start = start
+    return rewritten, resources
+
+def rewrite_published_sources(book_dir, items):
+    sources = {}
     resources = set()
     for item in items:
         if item[0] != "file":
             continue
         source = (book_dir / item[1]).resolve()
         text = source.read_text(encoding="utf-8")
-        for target in markdown_resource_targets(text):
-            resource = resolve_local_resource(book_dir, source, target)
-            if resource:
-                resources.add(resource)
-    return resources
+        rewritten, source_resources = rewrite_published_resources(
+            book_dir, source, text
+        )
+        sources[item[1]] = rewritten
+        resources.update(source_resources)
+    return sources, resources
 
 def fix_inline_dollar(text):
     def repl(m):
@@ -248,16 +361,6 @@ def process_file(text, reldir, mermaid_store, path_to_id):
     text = re.sub(r'\[!\[[^\]]*\]\(https?://[^)]*\)\]\([^)]*\)', '', text)
     text = re.sub(r'!\[[^\]]*\]\(https?://[^)]*\)', '', text)
     text = re.sub(r'^\s*\[\]\([^)]*\)\s*$', '', text, flags=re.M)
-    def md_img(m):
-        alt, url = m.group(1), m.group(2).strip()
-        if url.startswith(("http://","https://","/","data:")): return m.group(0)
-        return f"![{alt}]({posixpath.normpath(posixpath.join(reldir, url))})"
-    text = re.sub(r'!\[([^\]]*)\]\(([^)]+)\)', md_img, text)
-    def html_img(m):
-        src = m.group(1)
-        if src.startswith(("http://","https://","/","data:")): return m.group(0)
-        return m.group(0).replace(f'src="{src}"', f'src="{posixpath.normpath(posixpath.join(reldir, src))}"')
-    text = re.sub(r'<img\s+[^>]*src="([^"]+)"[^>]*>', html_img, text)
     def md_link(m):
         label, target = m.group(1), m.group(2).strip()
         if "#" in target: target = target.split("#", 1)[0]
@@ -393,7 +496,7 @@ def main():
     items = parse_summary(book_dir)
     if not any(item[0] == "file" for item in items):
         raise ValueError("SUMMARY.md contains no readable Markdown entries")
-    resources = validate_published_resources(book_dir, items)
+    rewritten_sources, resources = rewrite_published_sources(book_dir, items)
     published_sources = {
         (book_dir / item[1]).resolve() for item in items if item[0] == "file"
     }
@@ -411,7 +514,7 @@ def main():
     for it in items:
         if it[0] != "file": continue
         _, path, title, lvl = it
-        with (book_dir / path).open(encoding="utf-8") as f: txt = f.read()
+        txt = rewritten_sources[path]
         txt = process_file(txt, posixpath.dirname(path), mermaid_store, path_to_id)
         chunks.append(f'\n\nPGBKZZp{pi}ZZ\n\n{txt}\n\n'); pi += 1
     combined = "\n".join(chunks)
