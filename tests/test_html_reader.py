@@ -8,6 +8,7 @@ import sys
 import tempfile
 import textwrap
 import unittest
+from html.parser import HTMLParser
 from pathlib import Path
 
 from tools import build_html_reader as reader
@@ -17,6 +18,15 @@ ROOT = Path(__file__).resolve().parents[1]
 READER = ROOT / "tools" / "build_html_reader.py"
 RENDERER = ROOT / "tools" / "render_mermaid.py"
 VERIFIER = ROOT / "tools" / "verify_artifacts.py"
+
+
+class StartTagCollector(HTMLParser):
+    def __init__(self):
+        super().__init__(convert_charrefs=True)
+        self.tags = []
+
+    def handle_starttag(self, tag, attrs):
+        self.tags.append((tag, attrs))
 
 
 class HtmlReaderTests(unittest.TestCase):
@@ -486,6 +496,175 @@ class HtmlReaderTests(unittest.TestCase):
                     attribute_entity.resolve(),
                 },
             )
+
+    def test_style_entities_cannot_swap_the_validated_css_token(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory).resolve()
+            book = self.make_book(root)
+            (book / "safe.png").write_bytes(b"SAFE")
+            (root / "outside.png").write_bytes(b"OUTSIDE_ENTITY_SWAP_MARKER")
+            (book / "a.md").write_text(
+                "# A\n\n"
+                '<div style="&#47;* background:url(\'safe.png\') */ '
+                'background:u&#114;l(\'../outside.png\')">x</div>\n',
+                encoding="utf-8",
+            )
+            svg = root / "svg"
+            svg.mkdir()
+            (svg / "d-1.svg").write_text(
+                '<svg id="my-svg"><text>ok</text></svg>', encoding="utf-8"
+            )
+            called = root / "pandoc-called"
+            output = root / "reader.html"
+
+            result = self.run_reader(
+                book,
+                svg,
+                output,
+                self.fake_pandoc(root, call_marker=called),
+                "--strict",
+            )
+
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("encoded CSS token structure", result.stderr)
+            self.assertFalse(called.exists(), "entity validation must precede Pandoc")
+            self.assertFalse(output.exists())
+
+    @unittest.skipUnless(shutil.which("pandoc"), "Pandoc is required for integration coverage")
+    def test_real_pandoc_never_receives_entity_swapped_css_resource(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory).resolve()
+            book = self.make_book(root)
+            (book / "safe.png").write_bytes(b"SAFE")
+            (root / "outside.png").write_bytes(b"OUTSIDE_ENTITY_SWAP_MARKER")
+            (book / "a.md").write_text(
+                "# A\n\n"
+                '<div style="&#47;* background:url(\'safe.png\') */ '
+                'background:u&#114;l(\'../outside.png\')">x</div>\n',
+                encoding="utf-8",
+            )
+            svg = root / "svg"
+            svg.mkdir()
+            (svg / "d-1.svg").write_text(
+                '<svg id="my-svg"><text>ok</text></svg>', encoding="utf-8"
+            )
+            output = root / "reader.html"
+
+            result = self.run_reader(
+                book,
+                svg,
+                output,
+                Path(shutil.which("pandoc")).parent,
+                "--strict",
+            )
+
+            self.assertNotEqual(result.returncode, 0)
+            self.assertFalse(output.exists())
+            self.assertNotIn(
+                "OUTSIDE_ENTITY_SWAP_MARKER", result.stdout + result.stderr
+            )
+
+    def test_canonical_rewrite_preserves_html_attribute_boundaries(self):
+        variants = {
+            "double": (
+                '<img src="safe.png?x=&quot; onerror=&quot;alert(1)#frag">',
+                'safe.png?x=" onerror="alert(1)#frag',
+            ),
+            "single": (
+                "<img src='safe.png?x=&#39; onerror=&#39;alert(1)#frag'>",
+                "safe.png?x=' onerror='alert(1)#frag",
+            ),
+            "unquoted": (
+                "<img src=safe.png?x=&#32;onerror&#61;alert(1)#frag>",
+                "safe.png?x= onerror=alert(1)#frag",
+            ),
+        }
+        with tempfile.TemporaryDirectory() as directory:
+            book = Path(directory).resolve()
+            source = book / "a.md"
+            (book / "safe.png").write_bytes(b"SAFE")
+            for name, (body, expected) in variants.items():
+                with self.subTest(name=name):
+                    source.write_text(body, encoding="utf-8")
+                    rewritten, resources = reader.rewrite_published_resources(
+                        book, source, body
+                    )
+                    parser = StartTagCollector()
+                    parser.feed(rewritten)
+                    self.assertEqual(parser.tags, [("img", [("src", expected)])])
+                    self.assertEqual(resources, {(book / "safe.png").resolve()})
+
+    def test_canonical_rewrite_preserves_css_string_boundaries(self):
+        variants = {
+            "double": (
+                r'<style>.x{background:url("safe.png?x=\";color:red;/*#frag")}</style>',
+                'safe.png?x=";color:red;/*#frag',
+                False,
+            ),
+            "single": (
+                r"<style>.x{background:url('safe.png?x=\';color:red;/*#frag')}</style>",
+                "safe.png?x=';color:red;/*#frag",
+                False,
+            ),
+            "unquoted": (
+                r"<style>.x{background:url(safe.png?x=\);color:red#frag)}</style>",
+                "safe.png?x=);color:red#frag",
+                False,
+            ),
+            "html-style": (
+                r'''<div style="background:url('safe.png?x=\';color:red;/*#frag')">x</div>''',
+                "safe.png?x=';color:red;/*#frag",
+                True,
+            ),
+        }
+        with tempfile.TemporaryDirectory() as directory:
+            book = Path(directory).resolve()
+            source = book / "a.md"
+            (book / "safe.png").write_bytes(b"SAFE")
+            for name, (body, expected, is_attribute) in variants.items():
+                with self.subTest(name=name):
+                    source.write_text(body, encoding="utf-8")
+                    rewritten, _ = reader.rewrite_published_resources(
+                        book, source, body
+                    )
+                    if is_attribute:
+                        parser = StartTagCollector()
+                        parser.feed(rewritten)
+                        self.assertEqual(len(parser.tags), 1)
+                        style = dict(parser.tags[0][1])["style"]
+                    else:
+                        style = rewritten.split("<style>", 1)[1].split(
+                            "</style>", 1
+                        )[0]
+                    tokens = list(reader.css_resource_tokens(style))
+                    self.assertEqual(len(tokens), 1)
+                    self.assertEqual(
+                        reader.decoded_resource_target(tokens[0].target, css=True),
+                        expected,
+                    )
+
+    def test_canonical_rewrite_preserves_markdown_destination_context(self):
+        variants = {
+            "angle": (
+                "![x](<safe.png?x=a b#frag>)",
+                "![x](<safe.png?x=a%20b#frag>)",
+            ),
+            "bare": (
+                "![x](safe.png?x=&#41;#frag)",
+                "![x](safe.png?x=%29#frag)",
+            ),
+        }
+        with tempfile.TemporaryDirectory() as directory:
+            book = Path(directory).resolve()
+            source = book / "a.md"
+            (book / "safe.png").write_bytes(b"SAFE")
+            for name, (body, expected) in variants.items():
+                with self.subTest(name=name):
+                    source.write_text(body, encoding="utf-8")
+                    rewritten, _ = reader.rewrite_published_resources(
+                        book, source, body
+                    )
+                    self.assertEqual(rewritten, expected)
 
     def test_stylesheet_outside_remote_and_inline_imports_fail_before_pandoc(self):
         variants = {

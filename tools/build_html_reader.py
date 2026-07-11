@@ -10,6 +10,7 @@ scroll by default; JS (Safari, Documents app, etc.) upgrades to one-page-at-a-ti
 """
 import argparse, html as html_lib, os, re, subprocess, sys, posixpath, tempfile
 from dataclasses import dataclass
+from html.entities import html5 as HTML5_ENTITIES
 from html.parser import HTMLParser
 from pathlib import Path
 from urllib.parse import quote, unquote, urlsplit
@@ -80,6 +81,9 @@ class ResourceToken:
     end: int
     target: str
     kind: str = "resource"
+    context: str = "plain"
+    quote: str = ""
+    container_quote: str = ""
 
 @dataclass(frozen=True)
 class HTMLAttribute:
@@ -87,6 +91,7 @@ class HTMLAttribute:
     start: int
     end: int
     value: str
+    quote: str = ""
 
 def normalize_reference_label(label):
     return " ".join(label.split()).casefold()
@@ -165,11 +170,19 @@ def css_url_token(value, position, offset, kind):
     if cursor >= len(value):
         raise ValueError("unterminated CSS url()")
     if value[cursor] in "\"'":
+        quote_char = value[cursor]
         start, end, cursor = css_string_span(value, cursor)
         cursor = css_skip_space_and_comments(value, cursor)
         if cursor >= len(value) or value[cursor] != ")":
             raise ValueError("unterminated CSS url()")
-        return ResourceToken(offset + start, offset + end, value[start:end], kind), cursor + 1
+        return ResourceToken(
+            offset + start,
+            offset + end,
+            value[start:end],
+            kind,
+            "css",
+            quote_char,
+        ), cursor + 1
 
     start = cursor
     while cursor < len(value):
@@ -180,7 +193,13 @@ def css_url_token(value, position, offset, kind):
             end = cursor
             while end > start and value[end - 1].isspace():
                 end -= 1
-            return ResourceToken(offset + start, offset + end, value[start:end], kind), cursor + 1
+            return ResourceToken(
+                offset + start,
+                offset + end,
+                value[start:end],
+                kind,
+                "css",
+            ), cursor + 1
         elif char in "\"'(":
             raise ValueError("invalid unquoted CSS url()")
         else:
@@ -211,7 +230,12 @@ def css_resource_tokens(value, offset=0):
             if cursor < len(value) and value[cursor] in "\"'":
                 start, end, position = css_string_span(value, cursor)
                 yield ResourceToken(
-                    offset + start, offset + end, value[start:end], "css-import"
+                    offset + start,
+                    offset + end,
+                    value[start:end],
+                    "css-import",
+                    "css",
+                    value[cursor],
                 )
                 continue
             parsed = css_url_token(value, cursor, offset, "css-import")
@@ -261,19 +285,78 @@ def css_unescape(value):
         position += 1
     return "".join(output)
 
-def html_style_resource_tokens(value, offset=0):
+def html_unescape_with_spans(value):
+    """Decode HTML entities while mapping each decoded character to raw input."""
+    output = []
+    spans = []
+    position = 0
+    max_entity_length = max(map(len, HTML5_ENTITIES))
+    while position < len(value):
+        decoded = None
+        end = position + 1
+        if value.startswith("&#", position):
+            match = re.match(r"&#(?:[xX][0-9a-fA-F]+|[0-9]+);?", value[position:])
+            if match:
+                end = position + len(match.group(0))
+                decoded = html_lib.unescape(value[position:end])
+        elif value[position] == "&":
+            tail = value[position + 1 : position + 1 + max_entity_length]
+            for length in range(len(tail), 0, -1):
+                key = tail[:length]
+                if key in HTML5_ENTITIES:
+                    end = position + 1 + length
+                    decoded = HTML5_ENTITIES[key]
+                    break
+        if decoded is None:
+            decoded = value[position]
+        output.append(decoded)
+        spans.extend([(position, end)] * len(decoded))
+        position = end
+    text = "".join(output)
+    if text != html_lib.unescape(value):
+        raise ValueError("unsupported HTML entity form in style attribute")
+    return text, spans
+
+def decoded_span_in_raw(spans, start, end, raw_length):
+    if start == end:
+        boundary = spans[start][0] if start < len(spans) else raw_length
+        return boundary, boundary
+    return spans[start][0], spans[end - 1][1]
+
+def html_style_resource_tokens(value, offset=0, container_quote=""):
     """Parse style attributes without allowing entities to hide CSS syntax."""
-    tokens = list(css_resource_tokens(value, offset))
-    decoded = html_lib.unescape(value)
+    tokens = list(css_resource_tokens(value))
+    decoded, spans = html_unescape_with_spans(value)
     decoded_tokens = list(css_resource_tokens(decoded))
-    if [token.kind for token in tokens] != [token.kind for token in decoded_tokens]:
-        raise ValueError("encoded CSS syntax is not allowed in style attributes")
+    if len(tokens) != len(decoded_tokens):
+        raise ValueError(
+            "encoded CSS syntax is not allowed: encoded CSS token structure "
+            "changed in style attribute"
+        )
+    for token, decoded_token in zip(tokens, decoded_tokens):
+        mapped_span = decoded_span_in_raw(
+            spans, decoded_token.start, decoded_token.end, len(value)
+        )
+        raw_target = css_unescape(html_lib.unescape(token.target))
+        decoded_target = css_unescape(decoded_token.target)
+        if (
+            token.kind != decoded_token.kind
+            or (token.start, token.end) != mapped_span
+            or raw_target != decoded_target
+        ):
+            raise ValueError(
+                "encoded CSS syntax is not allowed: encoded CSS token structure "
+                "changed in style attribute"
+            )
     return [
         ResourceToken(
-            token.start,
-            token.end,
+            offset + token.start,
+            offset + token.end,
             token.target,
             f"html-{token.kind}",
+            "html-css",
+            token.quote,
+            container_quote,
         )
         for token in tokens
     ]
@@ -293,7 +376,12 @@ def srcset_resource_tokens(value, offset=0):
         ):
             position += 1
         if start < position:
-            yield ResourceToken(offset + start, offset + position, value[start:position])
+            yield ResourceToken(
+                offset + start,
+                offset + position,
+                value[start:position],
+                context="srcset",
+            )
         depth = 0
         while position < length:
             char = value[position]
@@ -328,6 +416,7 @@ def html_attributes(raw_tag, offset):
             position += 1
         if position >= length:
             return
+        quote_char = ""
         if raw_tag[position] in "\"'":
             quote_char = raw_tag[position]
             position += 1
@@ -347,6 +436,7 @@ def html_attributes(raw_tag, offset):
             offset + value_start,
             offset + value_end,
             raw_tag[value_start:value_end],
+            quote_char,
         )
 
 class HTMLResourceTokenParser(HTMLParser):
@@ -386,7 +476,9 @@ class HTMLResourceTokenParser(HTMLParser):
         for attribute in attributes:
             if attribute.name == "style":
                 self.tokens.extend(
-                    html_style_resource_tokens(attribute.value, attribute.start)
+                    html_style_resource_tokens(
+                        attribute.value, attribute.start, attribute.quote
+                    )
                 )
 
         allowed = HTML_RESOURCE_ATTRIBUTES.get(tag, set())
@@ -404,7 +496,17 @@ class HTMLResourceTokenParser(HTMLParser):
                 continue
             if attribute.name == "srcset":
                 self.tokens.extend(
-                    srcset_resource_tokens(attribute.value, attribute.start)
+                    ResourceToken(
+                        token.start,
+                        token.end,
+                        token.target,
+                        token.kind,
+                        "html-attribute",
+                        attribute.quote,
+                    )
+                    for token in srcset_resource_tokens(
+                        attribute.value, attribute.start
+                    )
                 )
             else:
                 self.tokens.append(
@@ -415,19 +517,35 @@ class HTMLResourceTokenParser(HTMLParser):
                         "stylesheet"
                         if tag == "link" and "stylesheet" in rels
                         else "resource",
+                        "html-attribute",
+                        attribute.quote,
                     )
                 )
 
 def markdown_resource_tokens(text):
     tokens = []
     for match in INLINE_IMAGE_RE.finditer(text):
-        tokens.append(ResourceToken(*match.span(1), match.group(1)))
+        target = match.group(1)
+        tokens.append(
+            ResourceToken(
+                *match.span(1),
+                target,
+                context="markdown",
+                quote="<" if target.startswith("<") and target.endswith(">") else "",
+            )
+        )
 
     definitions = {}
     for match in REFERENCE_DEFINITION_RE.finditer(text):
+        target = match.group(2)
         definitions.setdefault(
             normalize_reference_label(match.group(1)),
-            ResourceToken(*match.span(2), match.group(2)),
+            ResourceToken(
+                *match.span(2),
+                target,
+                context="markdown",
+                quote="<" if target.startswith("<") and target.endswith(">") else "",
+            ),
         )
     for match in REFERENCE_IMAGE_RE.finditer(text):
         label = match.group(2) or match.group(1)
@@ -454,6 +572,89 @@ def decoded_resource_target(raw_target, css=False, html_css=False):
     if target.startswith("<") and target.endswith(">"):
         target = target[1:-1].strip()
     return target
+
+def html_attribute_replacement(value, quote_char):
+    """Encode one URL for its original HTML attribute quote context."""
+    quoted = {
+        "&": "&amp;",
+        "<": "&lt;",
+        ">": "&gt;",
+    }
+    if quote_char == '"':
+        quoted['"'] = "&quot;"
+    elif quote_char == "'":
+        quoted["'"] = "&#39;"
+    if quote_char:
+        return "".join(quoted.get(char, char) for char in value)
+
+    unquoted = {
+        **quoted,
+        '"': "&quot;",
+        "'": "&#39;",
+        "=": "&#61;",
+        "`": "&#96;",
+    }
+    output = []
+    for char in value:
+        if char.isspace():
+            output.append(f"&#{ord(char)};")
+        else:
+            output.append(unquoted.get(char, char))
+    return "".join(output)
+
+def css_replacement(value, quote_char):
+    """Encode one URL without changing its value in a CSS url() token."""
+    output = []
+    for char in value:
+        codepoint = ord(char)
+        if quote_char:
+            if char == "\\":
+                output.append("\\\\")
+            elif char == quote_char:
+                output.append("\\" + char)
+            elif char in "\r\n\f" or codepoint == 0:
+                output.append(f"\\{(0xFFFD if codepoint == 0 else codepoint):06x}")
+            else:
+                output.append(char)
+        elif (
+            char.isspace()
+            or char in "\"'()\\"
+            or codepoint == 0
+            or codepoint < 0x20
+            or codepoint == 0x7F
+        ):
+            output.append(f"\\{(0xFFFD if codepoint == 0 else codepoint):06x}")
+        else:
+            output.append(char)
+    return "".join(output)
+
+def markdown_replacement(value, angle_destination):
+    """Percent-encode Markdown destination delimiters and preserve angle form."""
+    unsafe = "<>\\\r\n\t "
+    if not angle_destination:
+        unsafe += "()\"'"
+    output = []
+    for char in value:
+        if char in unsafe or char.isspace():
+            output.extend(f"%{byte:02X}" for byte in char.encode("utf-8"))
+        else:
+            output.append(char)
+    replacement = "".join(output)
+    return f"<{replacement}>" if angle_destination else replacement
+
+def encode_canonical_target(token, canonical):
+    if token.context == "html-attribute":
+        return html_attribute_replacement(canonical, token.quote)
+    if token.context in {"css", "html-css"}:
+        replacement = css_replacement(canonical, token.quote)
+        if token.context == "html-css":
+            replacement = html_attribute_replacement(
+                replacement, token.container_quote
+            )
+        return replacement
+    if token.context == "markdown":
+        return markdown_replacement(canonical, token.quote == "<")
+    return canonical
 
 def resolve_local_resource(book_dir, source, raw_target, css=False, html_css=False):
     target = decoded_resource_target(raw_target, css=css, html_css=html_css)
@@ -486,15 +687,15 @@ def resolve_local_resource(book_dir, source, raw_target, css=False, html_css=Fal
         )
     return resource
 
-def canonical_resource_target(book_dir, raw_target, resource, css=False, html_css=False):
-    target = decoded_resource_target(raw_target, css=css, html_css=html_css)
+def canonical_resource_target(book_dir, token, resource, css=False, html_css=False):
+    target = decoded_resource_target(token.target, css=css, html_css=html_css)
     parsed = urlsplit(target)
     canonical = quote(resource.relative_to(book_dir).as_posix(), safe="/")
     if parsed.query:
         canonical += f"?{parsed.query}"
     if parsed.fragment:
         canonical += f"#{parsed.fragment}"
-    return canonical
+    return encode_canonical_target(token, canonical)
 
 class CSSDependencyValidator:
     """Validate the exact local CSS dependency graph Pandoc will traverse."""
@@ -588,7 +789,7 @@ def rewrite_published_resources(book_dir, source, text):
                     token.end,
                     canonical_resource_target(
                         book_dir,
-                        token.target,
+                        token,
                         resource,
                         css=is_css,
                         html_css=is_html_css,
