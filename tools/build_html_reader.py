@@ -93,6 +93,15 @@ class HTMLAttribute:
     value: str
     quote: str = ""
 
+@dataclass(frozen=True)
+class SrcsetCandidate:
+    start: int
+    end: int
+    target_start: int
+    target_end: int
+    target: str
+    descriptors: str
+
 def normalize_reference_label(label):
     return " ".join(label.split()).casefold()
 
@@ -361,27 +370,23 @@ def html_style_resource_tokens(value, offset=0, container_quote=""):
         for token in tokens
     ]
 
-def srcset_resource_tokens(value, offset=0):
-    """Yield positioned srcset URLs without splitting a data URI comma."""
+def srcset_candidates(value):
+    """Parse positioned srcset candidates without splitting a data URI comma."""
     position, length = 0, len(value)
     while position < length:
         while position < length and (value[position].isspace() or value[position] == ","):
             position += 1
         if position >= length:
             return
-        start = position
+        candidate_start = position
+        target_start = position
         is_data = value[position : position + 5].casefold() == "data:"
         while position < length and not value[position].isspace() and (
             is_data or value[position] != ","
         ):
             position += 1
-        if start < position:
-            yield ResourceToken(
-                offset + start,
-                offset + position,
-                value[start:position],
-                context="srcset",
-            )
+        target_end = position
+        descriptor_start = position
         depth = 0
         while position < length:
             char = value[position]
@@ -390,9 +395,78 @@ def srcset_resource_tokens(value, offset=0):
             elif char == ")" and depth:
                 depth -= 1
             elif char == "," and depth == 0:
+                candidate_end = position
                 position += 1
                 break
             position += 1
+        else:
+            candidate_end = length
+        yield SrcsetCandidate(
+            candidate_start,
+            candidate_end,
+            target_start,
+            target_end,
+            value[target_start:target_end],
+            value[descriptor_start:candidate_end],
+        )
+
+def srcset_resource_tokens(value, offset=0):
+    """Yield positioned URLs from already validated srcset candidate syntax."""
+    for candidate in srcset_candidates(value):
+        yield ResourceToken(
+            offset + candidate.target_start,
+            offset + candidate.target_end,
+            candidate.target,
+            context="srcset",
+        )
+
+def normalized_srcset_descriptors(value):
+    return tuple(value.split())
+
+def html_srcset_resource_tokens(value, offset=0, container_quote=""):
+    """Reject HTML entities that change srcset candidate identity or boundaries."""
+    candidates = list(srcset_candidates(value))
+    decoded, spans = html_unescape_with_spans(value)
+    decoded_candidates = list(srcset_candidates(decoded))
+    if len(candidates) != len(decoded_candidates):
+        raise ValueError(
+            "encoded srcset syntax is not allowed: encoded srcset candidate "
+            "identity changed"
+        )
+    for candidate, decoded_candidate in zip(candidates, decoded_candidates):
+        target_span = decoded_span_in_raw(
+            spans,
+            decoded_candidate.target_start,
+            decoded_candidate.target_end,
+            len(value),
+        )
+        candidate_span = decoded_span_in_raw(
+            spans,
+            decoded_candidate.start,
+            decoded_candidate.end,
+            len(value),
+        )
+        if (
+            (candidate.target_start, candidate.target_end) != target_span
+            or (candidate.start, candidate.end) != candidate_span
+            or html_lib.unescape(candidate.target) != decoded_candidate.target
+            or normalized_srcset_descriptors(html_lib.unescape(candidate.descriptors))
+            != normalized_srcset_descriptors(decoded_candidate.descriptors)
+        ):
+            raise ValueError(
+                "encoded srcset syntax is not allowed: encoded srcset candidate "
+                "identity changed"
+            )
+    return [
+        ResourceToken(
+            offset + candidate.target_start,
+            offset + candidate.target_end,
+            candidate.target,
+            context="html-attribute",
+            quote=container_quote,
+        )
+        for candidate in candidates
+    ]
 
 def html_attributes(raw_tag, offset):
     position, length = 1, len(raw_tag)
@@ -496,16 +570,10 @@ class HTMLResourceTokenParser(HTMLParser):
                 continue
             if attribute.name == "srcset":
                 self.tokens.extend(
-                    ResourceToken(
-                        token.start,
-                        token.end,
-                        token.target,
-                        token.kind,
-                        "html-attribute",
+                    html_srcset_resource_tokens(
+                        attribute.value,
+                        attribute.start,
                         attribute.quote,
-                    )
-                    for token in srcset_resource_tokens(
-                        attribute.value, attribute.start
                     )
                 )
             else:

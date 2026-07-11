@@ -392,6 +392,89 @@ class HtmlReaderTests(unittest.TestCase):
             self.assertIn('<a href="../outside.html">ordinary</a>', rewritten)
             self.assertIn('<link rel="canonical" href="../outside.html">', rewritten)
 
+    def test_srcset_entity_decoding_cannot_change_candidate_identity(self):
+        variants = {
+            "decimal-comma":
+                '<img srcset="safe.png 1x&#44; ../outside.png 2x">',
+            "hex-comma":
+                '<img srcset="safe.png 1x&#x2c; ../outside.png 2x">',
+            "entity-space-and-quotes":
+                '<img srcset="safe.png?label=&#34;x&#34;&#32;1x">',
+        }
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory).resolve()
+            book = root / "book"
+            book.mkdir()
+            source = book / "a.md"
+            (book / "safe.png").write_bytes(b"SAFE")
+            (root / "outside.png").write_bytes(b"OUTSIDE_SRCSET_ENTITY_MARKER")
+
+            for name, body in variants.items():
+                with self.subTest(name=name):
+                    source.write_text(body, encoding="utf-8")
+                    with self.assertRaisesRegex(ValueError, "encoded srcset syntax"):
+                        reader.rewrite_published_resources(book, source, body)
+
+    def test_srcset_allows_data_comma_safe_entities_and_multiple_candidates(self):
+        with tempfile.TemporaryDirectory() as directory:
+            book = Path(directory).resolve()
+            source = book / "a.md"
+            (book / "safe.png").write_bytes(b"SAFE")
+            (book / "other.png").write_bytes(b"OTHER")
+            body = (
+                '<img srcset="data:image/png;base64,AAAA 1x, '
+                'safe.png?label=&#34;x&#34; 2x, other.png 3x">'
+            )
+            source.write_text(body, encoding="utf-8")
+
+            rewritten, resources = reader.rewrite_published_resources(
+                book, source, body
+            )
+
+            parser = StartTagCollector()
+            parser.feed(rewritten)
+            self.assertEqual(len(parser.tags), 1)
+            self.assertEqual(
+                dict(parser.tags[0][1])["srcset"],
+                'data:image/png;base64,AAAA 1x, safe.png?label="x" 2x, '
+                "other.png 3x",
+            )
+            self.assertEqual(
+                resources,
+                {(book / "safe.png").resolve(), (book / "other.png").resolve()},
+            )
+
+    @unittest.skipUnless(shutil.which("pandoc"), "Pandoc is required for integration coverage")
+    def test_real_pandoc_never_receives_entity_hidden_srcset_candidate(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory).resolve()
+            book = root / "book"
+            book.mkdir()
+            (book / "SUMMARY.md").write_text("* [A](a.md)\n", encoding="utf-8")
+            (book / "safe.png").write_bytes(b"SAFE")
+            marker = "OUTSIDE_SRCSET_ENTITY_MARKER"
+            (root / "outside.png").write_bytes(marker.encode())
+            (book / "a.md").write_text(
+                '# A\n\n<img srcset="safe.png 1x&#44; ../outside.png 2x">\n',
+                encoding="utf-8",
+            )
+            svg = root / "svg"
+            svg.mkdir()
+            output = root / "reader.html"
+
+            result = self.run_reader(
+                book,
+                svg,
+                output,
+                Path(shutil.which("pandoc")).parent,
+                "--strict",
+            )
+
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("encoded srcset syntax", result.stderr)
+            self.assertFalse(output.exists())
+            self.assertNotIn(marker, result.stdout + result.stderr)
+
     @unittest.skipUnless(shutil.which("pandoc"), "Pandoc is required for integration coverage")
     def test_nested_resource_rewrite_controls_real_pandoc_input(self):
         with tempfile.TemporaryDirectory() as directory:
