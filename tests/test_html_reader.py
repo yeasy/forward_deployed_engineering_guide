@@ -83,7 +83,15 @@ class HtmlReaderTests(unittest.TestCase):
         mmdc.chmod(0o755)
         return binary, chrome
 
-    def run_reader(self, book: Path, svg: Path, output: Path, binary: Path, *flags: str):
+    def run_reader(
+        self,
+        book: Path,
+        svg: Path,
+        output: Path,
+        binary: Path,
+        *flags: str,
+        timeout: float | None = None,
+    ):
         env = os.environ.copy()
         env["PATH"] = f"{binary}{os.pathsep}{env['PATH']}"
         return subprocess.run(
@@ -93,6 +101,7 @@ class HtmlReaderTests(unittest.TestCase):
             text=True,
             capture_output=True,
             check=False,
+            timeout=timeout,
         )
 
     def test_reader_smoke_requires_complete_inline_mermaid(self):
@@ -409,6 +418,346 @@ class HtmlReaderTests(unittest.TestCase):
             self.assertIn("SAFE_BOOK_MARKER", html)
             self.assertNotIn("OUTSIDE_BOOK_MARKER", html)
             self.assertRegex(html, r'href="\.\./\.\./outside\.html"')
+
+    def test_stylesheet_dependencies_decode_css_escapes_and_recurse(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory).resolve()
+            book = root / "book"
+            chapter = book / "chapter"
+            assets = chapter / "assets"
+            nested = assets / "nested"
+            nested.mkdir(parents=True)
+            source = chapter / "a.md"
+            stylesheet = assets / "root.css"
+            child = nested / "child.css"
+            spaced = assets / "safe image.png"
+            quoted = assets / 'safe"quote.png'
+            apostrophe = assets / "safe'quote.png"
+            external_literal_entity = assets / "safe&amp;external.png"
+            external_entity_decoy = assets / "safe&external.png"
+            block_literal_entity = assets / "safe&amp;block.png"
+            block_entity_decoy = assets / "safe&block.png"
+            attribute_entity = assets / "safe&attribute.png"
+            for path, content in (
+                (spaced, "SAFE_SPACE"),
+                (quoted, "SAFE_DOUBLE_QUOTE"),
+                (apostrophe, "SAFE_SINGLE_QUOTE"),
+                (external_literal_entity, "SAFE_EXTERNAL_LITERAL_ENTITY"),
+                (external_entity_decoy, "DECOY_EXTERNAL_ENTITY"),
+                (block_literal_entity, "SAFE_BLOCK_LITERAL_ENTITY"),
+                (block_entity_decoy, "DECOY_BLOCK_ENTITY"),
+                (attribute_entity, "SAFE_ATTRIBUTE_ENTITY"),
+            ):
+                path.write_text(content, encoding="utf-8")
+            stylesheet.write_text(
+                r'@\69mport url("nested/child\2e css");'
+                "\n.root { color: black; }\n",
+                encoding="utf-8",
+            )
+            child.write_text(
+                ".a { background: url('../safe\\20 image.png'); }\n"
+                ".b { background: url('../safe\\\"quote.png'); }\n"
+                '.c { background: url("../safe\\27 quote.png"); }\n'
+                '.d { background: url("../safe&amp;external.png"); }\n',
+                encoding="utf-8",
+            )
+            body = (
+                '<link rel="stylesheet" href="assets/root.css">\n'
+                '<style>.block { background: url("assets/safe&amp;block.png"); }</style>\n'
+                '<div style="background: url(\'assets/safe&amp;attribute.png\')">x</div>\n'
+            )
+            source.write_text(body, encoding="utf-8")
+
+            rewritten, resources = reader.rewrite_published_resources(
+                book, source, body
+            )
+
+            self.assertIn('href="chapter/assets/root.css"', rewritten)
+            self.assertEqual(
+                resources,
+                {
+                    stylesheet.resolve(),
+                    child.resolve(),
+                    spaced.resolve(),
+                    quoted.resolve(),
+                    apostrophe.resolve(),
+                    external_literal_entity.resolve(),
+                    block_literal_entity.resolve(),
+                    attribute_entity.resolve(),
+                },
+            )
+
+    def test_stylesheet_outside_remote_and_inline_imports_fail_before_pandoc(self):
+        variants = {
+            "outside-url": ".x { background: url(../../../outside.bin); }",
+            "outside-import-string": '@import "../../../outside.bin";',
+            "outside-import-url": "@import url('../../../outside.bin');",
+            "escaped-url-keyword": r".x { background: u\72l(../../../outside.bin); }",
+            "escaped-import-keyword": r'@\69mport "../../../outside.bin";',
+            "remote-url": ".x { background: url(https://example.com/x.png); }",
+            "data-import": '@import url("data:text/css,.x%7Bcolor:red%7D");',
+        }
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory).resolve()
+            for name, stylesheet_text in variants.items():
+                with self.subTest(name=name):
+                    case = root / name
+                    case.mkdir()
+                    book = self.make_book(case)
+                    assets = book / "assets"
+                    assets.mkdir()
+                    (case / "outside.bin").write_text(
+                        f"OUTSIDE_CSS_MARKER_{name}", encoding="utf-8"
+                    )
+                    (assets / "root.css").write_text(
+                        stylesheet_text, encoding="utf-8"
+                    )
+                    (book / "a.md").write_text(
+                        '# A\n\n<link rel="stylesheet" href="assets/root.css">\n',
+                        encoding="utf-8",
+                    )
+                    svg = case / "svg"
+                    svg.mkdir()
+                    output = case / "reader.html"
+                    called = case / "pandoc-called"
+                    result = self.run_reader(
+                        book,
+                        svg,
+                        output,
+                        self.fake_pandoc(case, call_marker=called),
+                        "--strict",
+                    )
+                    self.assertNotEqual(result.returncode, 0, name)
+                    self.assertFalse(called.exists(), name)
+                    self.assertFalse(output.exists(), name)
+
+            case = root / "inline-import"
+            case.mkdir()
+            book = self.make_book(case)
+            assets = book / "assets"
+            assets.mkdir()
+            (assets / "safe.css").write_text(
+                ".safe { color: green; }", encoding="utf-8"
+            )
+            (book / "a.md").write_text(
+                '# A\n\n<style>@import "assets/safe.css";</style>\n',
+                encoding="utf-8",
+            )
+            svg = case / "svg"
+            svg.mkdir()
+            called = case / "pandoc-called"
+            result = self.run_reader(
+                book,
+                svg,
+                case / "reader.html",
+                self.fake_pandoc(case, call_marker=called),
+                "--strict",
+            )
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("inline CSS @import", result.stderr)
+            self.assertFalse(called.exists())
+
+            encoded_css = {
+                "encoded-url-keyword":
+                    '<div style="background:&#117;rl(../outside.bin)">x</div>',
+                "encoded-import-keyword":
+                    '<div style="@&#105;mport &quot;../outside.bin&quot;;">x</div>',
+            }
+            for name, body in encoded_css.items():
+                with self.subTest(name=name):
+                    case = root / name
+                    case.mkdir()
+                    book = self.make_book(case)
+                    (case / "outside.bin").write_text(
+                        f"OUTSIDE_CSS_MARKER_{name}", encoding="utf-8"
+                    )
+                    (book / "a.md").write_text(
+                        f"# A\n\n{body}\n", encoding="utf-8"
+                    )
+                    svg = case / "svg"
+                    svg.mkdir()
+                    called = case / "pandoc-called"
+                    result = self.run_reader(
+                        book,
+                        svg,
+                        case / "reader.html",
+                        self.fake_pandoc(case, call_marker=called),
+                        "--strict",
+                    )
+                    self.assertNotEqual(result.returncode, 0, name)
+                    self.assertIn("encoded CSS syntax", result.stderr, name)
+                    self.assertFalse(called.exists(), name)
+
+    def test_stylesheet_cycle_depth_and_size_limits_fail_before_pandoc(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory).resolve()
+
+            def run_case(name: str, populate):
+                case = root / name
+                case.mkdir()
+                book = self.make_book(case)
+                assets = book / "assets"
+                assets.mkdir()
+                populate(assets)
+                (book / "a.md").write_text(
+                    '# A\n\n<link rel="stylesheet" href="assets/0.css">\n',
+                    encoding="utf-8",
+                )
+                svg = case / "svg"
+                svg.mkdir()
+                called = case / "pandoc-called"
+                result = self.run_reader(
+                    book,
+                    svg,
+                    case / "reader.html",
+                    self.fake_pandoc(case, call_marker=called),
+                    "--strict",
+                )
+                self.assertNotEqual(result.returncode, 0, name)
+                self.assertFalse(called.exists(), name)
+                return result
+
+            def cycle(assets: Path):
+                (assets / "0.css").write_text(
+                    '@import "1.css";', encoding="utf-8"
+                )
+                (assets / "1.css").write_text(
+                    '@import "0.css";', encoding="utf-8"
+                )
+
+            def deep(assets: Path):
+                for index in range(18):
+                    tail = (
+                        f'@import "{index + 1}.css";'
+                        if index < 17
+                        else ".done { color: green; }"
+                    )
+                    (assets / f"{index}.css").write_text(tail, encoding="utf-8")
+
+            def large(assets: Path):
+                (assets / "0.css").write_text(
+                    ".x{" + " " * (1024 * 1024) + "}", encoding="utf-8"
+                )
+
+            self.assertIn("CSS import cycle", run_case("cycle", cycle).stderr)
+            self.assertIn("CSS import depth limit", run_case("depth", deep).stderr)
+            self.assertIn("CSS size limit", run_case("size", large).stderr)
+
+    @unittest.skipUnless(shutil.which("pandoc"), "Pandoc is required for integration coverage")
+    def test_real_pandoc_embeds_only_recursively_validated_stylesheet_content(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory).resolve()
+            book = root / "book"
+            chapter = book / "chapter"
+            assets = chapter / "assets"
+            nested = assets / "nested"
+            nested.mkdir(parents=True)
+            (book / "SUMMARY.md").write_text(
+                "* [Nested CSS](chapter/a.md)\n", encoding="utf-8"
+            )
+            (chapter / "a.md").write_text(
+                '# Nested CSS\n\n<link rel="stylesheet" href="assets/root.css">\n',
+                encoding="utf-8",
+            )
+            (assets / "root.css").write_text(
+                '@import "nested/child.css";\n.root { color: black; }\n',
+                encoding="utf-8",
+            )
+            (nested / "child.css").write_text(
+                '@import url("leaf.css");\n.child { color: green; }\n',
+                encoding="utf-8",
+            )
+            (nested / "leaf.css").write_text(
+                '.safe-marker::before { content: "SAFE_CSS_MARKER"; }\n'
+                '.safe-image { background: url("../safe.png"); }\n',
+                encoding="utf-8",
+            )
+            (assets / "safe.png").write_bytes(b"SAFE_IMAGE_MARKER")
+            (root / "outside.css").write_text(
+                "OUTSIDE_CSS_MARKER", encoding="utf-8"
+            )
+            svg = root / "svg"
+            svg.mkdir()
+            output = root / "reader.html"
+
+            result = self.run_reader(
+                book,
+                svg,
+                output,
+                Path(shutil.which("pandoc")).parent,
+                "--strict",
+            )
+
+            self.assertEqual(result.returncode, 0, result.stderr)
+            rendered = output.read_text(encoding="utf-8")
+            self.assertIn("SAFE_CSS_MARKER", rendered)
+            self.assertIn("data:image/png;base64", rendered)
+            self.assertNotIn("OUTSIDE_CSS_MARKER", rendered)
+            self.assertNotRegex(rendered, r"@import\b")
+
+    @unittest.skipUnless(shutil.which("pandoc"), "Pandoc is required for integration coverage")
+    def test_real_pandoc_never_receives_unsafe_or_cyclic_css(self):
+        variants = {
+            "outside-url": (
+                '<link rel="stylesheet" href="assets/root.css">',
+                {"root.css": ".x { background: url(../../../outside.bin); }"},
+            ),
+            "outside-import": (
+                '<link rel="stylesheet" href="assets/root.css">',
+                {"root.css": '@import "../../../outside.bin";'},
+            ),
+            "inline-import": (
+                '<style>@import "../../outside.bin";</style>',
+                {},
+            ),
+            "cycle": (
+                '<link rel="stylesheet" href="assets/root.css">',
+                {
+                    "root.css": '@import "child.css";',
+                    "child.css": '@import "root.css";',
+                },
+            ),
+        }
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory).resolve()
+            for name, (body, stylesheets) in variants.items():
+                with self.subTest(name=name):
+                    case = root / name
+                    book = case / "book"
+                    chapter = book / "chapter"
+                    assets = chapter / "assets"
+                    assets.mkdir(parents=True)
+                    (book / "SUMMARY.md").write_text(
+                        "* [A](chapter/a.md)\n", encoding="utf-8"
+                    )
+                    (chapter / "a.md").write_text(
+                        f"# A\n\n{body}\n", encoding="utf-8"
+                    )
+                    for relative, content in stylesheets.items():
+                        (assets / relative).write_text(content, encoding="utf-8")
+                    (case / "outside.bin").write_text(
+                        f"OUTSIDE_CSS_MARKER_{name}", encoding="utf-8"
+                    )
+                    svg = case / "svg"
+                    svg.mkdir()
+                    output = case / "reader.html"
+
+                    result = self.run_reader(
+                        book,
+                        svg,
+                        output,
+                        Path(shutil.which("pandoc")).parent,
+                        "--strict",
+                        timeout=10,
+                    )
+
+                    self.assertNotEqual(result.returncode, 0, name)
+                    self.assertFalse(output.exists(), name)
+                    self.assertNotIn(
+                        f"OUTSIDE_CSS_MARKER_{name}",
+                        result.stdout + result.stderr,
+                        name,
+                    )
 
     def test_output_cannot_overwrite_nested_published_source(self):
         with tempfile.TemporaryDirectory() as directory:

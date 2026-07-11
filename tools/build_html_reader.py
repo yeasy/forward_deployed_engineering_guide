@@ -45,10 +45,6 @@ REFERENCE_DEFINITION_RE = re.compile(
 )
 REFERENCE_IMAGE_RE = re.compile(r'!\[([^\]]*)\]\[([^\]]*)\]')
 SHORTCUT_IMAGE_RE = re.compile(r'!\[([^\]]+)\](?![\[(])')
-CSS_URL_RE = re.compile(
-    r'''url\(\s*(?:(?P<quote>["'])(?P<quoted>.*?)(?P=quote)|(?P<bare>[^)]*))\s*\)''',
-    re.I | re.S,
-)
 HTML_RESOURCE_ATTRIBUTES = {
     "img": {"src", "srcset"},
     "source": {"src", "srcset"},
@@ -73,12 +69,17 @@ RESOURCE_LINK_RELS = {
     "modulepreload",
     "prefetch",
 }
+CSS_MAX_IMPORT_DEPTH = 16
+CSS_MAX_FILE_BYTES = 1024 * 1024
+CSS_MAX_TOTAL_BYTES = 4 * 1024 * 1024
+CSS_MAX_FILES = 256
 
 @dataclass(frozen=True)
 class ResourceToken:
     start: int
     end: int
     target: str
+    kind: str = "resource"
 
 @dataclass(frozen=True)
 class HTMLAttribute:
@@ -90,16 +91,192 @@ class HTMLAttribute:
 def normalize_reference_label(label):
     return " ".join(label.split()).casefold()
 
+def css_name_char(char):
+    return char.isalnum() or char in "_-" or ord(char) >= 128
+
+def css_skip_space_and_comments(value, position):
+    length = len(value)
+    while position < length:
+        if value[position].isspace():
+            position += 1
+        elif value.startswith("/*", position):
+            end = value.find("*/", position + 2)
+            position = length if end < 0 else end + 2
+        else:
+            break
+    return position
+
+def css_escape_end(value, position):
+    """Return the first position after one CSS escape starting at backslash."""
+    position += 1
+    if position >= len(value):
+        return position
+    if value[position] in "\r\n\f":
+        if value[position] == "\r" and position + 1 < len(value) and value[position + 1] == "\n":
+            position += 1
+        return position + 1
+    match = re.match(r"[0-9a-fA-F]{1,6}", value[position:])
+    if match:
+        position += len(match.group(0))
+        if position < len(value) and value[position].isspace():
+            if value[position] == "\r" and position + 1 < len(value) and value[position + 1] == "\n":
+                position += 1
+            position += 1
+        return position
+    return position + 1
+
+def css_identifier_end(value, position):
+    while position < len(value):
+        if css_name_char(value[position]):
+            position += 1
+        elif value[position] == "\\":
+            position = css_escape_end(value, position)
+        else:
+            break
+    return position
+
+def css_string_span(value, position):
+    """Return (content_start, content_end, next_position) for a CSS string."""
+    quote_char = value[position]
+    position += 1
+    start = position
+    while position < len(value):
+        char = value[position]
+        if char == "\\":
+            position = css_escape_end(value, position)
+        elif char == quote_char:
+            return start, position, position + 1
+        elif char in "\r\n\f":
+            raise ValueError("unterminated CSS string")
+        else:
+            position += 1
+    raise ValueError("unterminated CSS string")
+
+def css_url_token(value, position, offset, kind):
+    name_end = css_identifier_end(value, position)
+    if name_end == position or css_unescape(value[position:name_end]).casefold() != "url":
+        return None
+    if position and css_name_char(value[position - 1]):
+        return None
+    cursor = css_skip_space_and_comments(value, name_end)
+    if cursor >= len(value) or value[cursor] != "(":
+        return None
+    cursor = css_skip_space_and_comments(value, cursor + 1)
+    if cursor >= len(value):
+        raise ValueError("unterminated CSS url()")
+    if value[cursor] in "\"'":
+        start, end, cursor = css_string_span(value, cursor)
+        cursor = css_skip_space_and_comments(value, cursor)
+        if cursor >= len(value) or value[cursor] != ")":
+            raise ValueError("unterminated CSS url()")
+        return ResourceToken(offset + start, offset + end, value[start:end], kind), cursor + 1
+
+    start = cursor
+    while cursor < len(value):
+        char = value[cursor]
+        if char == "\\":
+            cursor = css_escape_end(value, cursor)
+        elif char == ")":
+            end = cursor
+            while end > start and value[end - 1].isspace():
+                end -= 1
+            return ResourceToken(offset + start, offset + end, value[start:end], kind), cursor + 1
+        elif char in "\"'(":
+            raise ValueError("invalid unquoted CSS url()")
+        else:
+            cursor += 1
+    raise ValueError("unterminated CSS url()")
+
 def css_resource_tokens(value, offset=0):
-    for match in CSS_URL_RE.finditer(value):
-        group = "quoted" if match.group("quote") else "bare"
-        start, end = match.span(group)
-        if group == "bare":
-            raw = value[start:end]
-            start += len(raw) - len(raw.lstrip())
-            end -= len(raw) - len(raw.rstrip())
-        if start < end:
-            yield ResourceToken(offset + start, offset + end, value[start:end])
+    """Yield positioned CSS url() and @import targets, honoring strings/escapes."""
+    position = 0
+    while position < len(value):
+        if value.startswith("/*", position):
+            position = css_skip_space_and_comments(value, position)
+            continue
+        if value[position] in "\"'":
+            _, _, position = css_string_span(value, position)
+            continue
+        import_end = (
+            css_identifier_end(value, position + 1)
+            if value[position] == "@"
+            else position
+        )
+        is_import = (
+            import_end > position + 1
+            and css_unescape(value[position + 1 : import_end]).casefold() == "import"
+        )
+        if is_import:
+            cursor = css_skip_space_and_comments(value, import_end)
+            if cursor < len(value) and value[cursor] in "\"'":
+                start, end, position = css_string_span(value, cursor)
+                yield ResourceToken(
+                    offset + start, offset + end, value[start:end], "css-import"
+                )
+                continue
+            parsed = css_url_token(value, cursor, offset, "css-import")
+            if parsed:
+                token, position = parsed
+                yield token
+                continue
+            raise ValueError("CSS @import requires a quoted string or url()")
+        parsed = css_url_token(value, position, offset, "css-url")
+        if parsed:
+            token, position = parsed
+            yield token
+            continue
+        position += 1
+
+def css_unescape(value):
+    """Decode CSS escapes in a resource token before URL/path resolution."""
+    output = []
+    position = 0
+    while position < len(value):
+        if value[position] != "\\":
+            output.append(value[position])
+            position += 1
+            continue
+        position += 1
+        if position >= len(value):
+            break
+        if value[position] in "\r\n\f":
+            if value[position] == "\r" and position + 1 < len(value) and value[position + 1] == "\n":
+                position += 1
+            position += 1
+            continue
+        match = re.match(r"[0-9a-fA-F]{1,6}", value[position:])
+        if match:
+            codepoint = int(match.group(0), 16)
+            position += len(match.group(0))
+            if position < len(value) and value[position].isspace():
+                if value[position] == "\r" and position + 1 < len(value) and value[position + 1] == "\n":
+                    position += 1
+                position += 1
+            if codepoint == 0 or codepoint > 0x10FFFF or 0xD800 <= codepoint <= 0xDFFF:
+                output.append("\N{REPLACEMENT CHARACTER}")
+            else:
+                output.append(chr(codepoint))
+            continue
+        output.append(value[position])
+        position += 1
+    return "".join(output)
+
+def html_style_resource_tokens(value, offset=0):
+    """Parse style attributes without allowing entities to hide CSS syntax."""
+    tokens = list(css_resource_tokens(value, offset))
+    decoded = html_lib.unescape(value)
+    decoded_tokens = list(css_resource_tokens(decoded))
+    if [token.kind for token in tokens] != [token.kind for token in decoded_tokens]:
+        raise ValueError("encoded CSS syntax is not allowed in style attributes")
+    return [
+        ResourceToken(
+            token.start,
+            token.end,
+            token.target,
+            f"html-{token.kind}",
+        )
+        for token in tokens
+    ]
 
 def srcset_resource_tokens(value, offset=0):
     """Yield positioned srcset URLs without splitting a data URI comma."""
@@ -209,10 +386,11 @@ class HTMLResourceTokenParser(HTMLParser):
         for attribute in attributes:
             if attribute.name == "style":
                 self.tokens.extend(
-                    css_resource_tokens(attribute.value, attribute.start)
+                    html_style_resource_tokens(attribute.value, attribute.start)
                 )
 
         allowed = HTML_RESOURCE_ATTRIBUTES.get(tag, set())
+        rels = set()
         if tag == "link":
             rels = {
                 token.casefold()
@@ -231,7 +409,12 @@ class HTMLResourceTokenParser(HTMLParser):
             else:
                 self.tokens.append(
                     ResourceToken(
-                        attribute.start, attribute.end, attribute.value
+                        attribute.start,
+                        attribute.end,
+                        attribute.value,
+                        "stylesheet"
+                        if tag == "link" and "stylesheet" in rels
+                        else "resource",
                     )
                 )
 
@@ -262,14 +445,27 @@ def markdown_resource_tokens(text):
     tokens.extend(parser.tokens)
     return sorted(set(tokens), key=lambda token: (token.start, token.end))
 
-def resolve_local_resource(book_dir, source, raw_target):
-    target = html_lib.unescape(raw_target.strip())
+def decoded_resource_target(raw_target, css=False, html_css=False):
+    if css:
+        target = html_lib.unescape(raw_target) if html_css else raw_target
+        target = css_unescape(target.strip())
+    else:
+        target = html_lib.unescape(raw_target.strip())
     if target.startswith("<") and target.endswith(">"):
         target = target[1:-1].strip()
+    return target
+
+def resolve_local_resource(book_dir, source, raw_target, css=False, html_css=False):
+    target = decoded_resource_target(raw_target, css=css, html_css=html_css)
     if not target or target.startswith("#"):
         return None
     parsed = urlsplit(target)
     scheme = parsed.scheme.lower()
+    if scheme in {"http", "https"} and css:
+        raise ValueError(
+            f"remote CSS resource is not allowed in strict reader in "
+            f"{source.relative_to(book_dir)}: {raw_target}"
+        )
     if scheme in {"http", "https", "data"}:
         return None
     if scheme or parsed.netloc:
@@ -290,10 +486,8 @@ def resolve_local_resource(book_dir, source, raw_target):
         )
     return resource
 
-def canonical_resource_target(book_dir, raw_target, resource):
-    target = html_lib.unescape(raw_target.strip())
-    if target.startswith("<") and target.endswith(">"):
-        target = target[1:-1].strip()
+def canonical_resource_target(book_dir, raw_target, resource, css=False, html_css=False):
+    target = decoded_resource_target(raw_target, css=css, html_css=html_css)
     parsed = urlsplit(target)
     canonical = quote(resource.relative_to(book_dir).as_posix(), safe="/")
     if parsed.query:
@@ -302,20 +496,103 @@ def canonical_resource_target(book_dir, raw_target, resource):
         canonical += f"#{parsed.fragment}"
     return canonical
 
+class CSSDependencyValidator:
+    """Validate the exact local CSS dependency graph Pandoc will traverse."""
+
+    def __init__(self, book_dir):
+        self.book_dir = Path(book_dir).resolve()
+        self.resources = set()
+        self.visited = set()
+        self.visiting = []
+        self.total_bytes = 0
+
+    def validate(self, stylesheet, depth=0):
+        stylesheet = Path(stylesheet).resolve()
+        if stylesheet in self.visiting:
+            cycle = self.visiting[self.visiting.index(stylesheet) :] + [stylesheet]
+            chain = " -> ".join(path.relative_to(self.book_dir).as_posix() for path in cycle)
+            raise ValueError(f"CSS import cycle: {chain}")
+        if stylesheet in self.visited:
+            return
+        if depth > CSS_MAX_IMPORT_DEPTH:
+            raise ValueError(
+                f"CSS import depth limit ({CSS_MAX_IMPORT_DEPTH}) exceeded at "
+                f"{stylesheet.relative_to(self.book_dir)}"
+            )
+        if len(self.visited) + len(self.visiting) >= CSS_MAX_FILES:
+            raise ValueError(f"CSS file limit ({CSS_MAX_FILES}) exceeded")
+        size = stylesheet.stat().st_size
+        if size > CSS_MAX_FILE_BYTES:
+            raise ValueError(
+                f"CSS size limit ({CSS_MAX_FILE_BYTES} bytes) exceeded at "
+                f"{stylesheet.relative_to(self.book_dir)}"
+            )
+        if self.total_bytes + size > CSS_MAX_TOTAL_BYTES:
+            raise ValueError(f"CSS total size limit ({CSS_MAX_TOTAL_BYTES} bytes) exceeded")
+        try:
+            text = stylesheet.read_text(encoding="utf-8")
+        except UnicodeDecodeError as error:
+            raise ValueError(
+                f"CSS must be UTF-8: {stylesheet.relative_to(self.book_dir)}"
+            ) from error
+        self.total_bytes += size
+        self.visiting.append(stylesheet)
+        try:
+            for token in css_resource_tokens(text):
+                target = decoded_resource_target(token.target, css=True)
+                if token.kind == "css-import" and urlsplit(target).scheme.lower() == "data":
+                    raise ValueError(
+                        f"data CSS @import is not allowed in strict reader in "
+                        f"{stylesheet.relative_to(self.book_dir)}"
+                    )
+                resource = resolve_local_resource(
+                    self.book_dir, stylesheet, token.target, css=True
+                )
+                if resource is None:
+                    continue
+                self.resources.add(resource)
+                if token.kind == "css-import":
+                    self.validate(resource, depth + 1)
+        finally:
+            self.visiting.pop()
+        self.visited.add(stylesheet)
+
 def rewrite_published_resources(book_dir, source, text):
     book_dir = Path(book_dir).resolve()
     source = Path(source).resolve()
     resources = set()
     replacements = []
+    css_dependencies = CSSDependencyValidator(book_dir)
     for token in markdown_resource_tokens(text):
-        resource = resolve_local_resource(book_dir, source, token.target)
+        if token.kind in {"css-import", "html-css-import"}:
+            raise ValueError(
+                f"inline CSS @import is not allowed in strict reader in "
+                f"{source.relative_to(book_dir)}; use a validated stylesheet link"
+            )
+        is_css = token.kind in {"css-url", "html-css-url"}
+        is_html_css = token.kind.startswith("html-css-")
+        resource = resolve_local_resource(
+            book_dir,
+            source,
+            token.target,
+            css=is_css,
+            html_css=is_html_css,
+        )
         if resource:
             resources.add(resource)
+            if token.kind == "stylesheet":
+                css_dependencies.validate(resource)
             replacements.append(
                 (
                     token.start,
                     token.end,
-                    canonical_resource_target(book_dir, token.target, resource),
+                    canonical_resource_target(
+                        book_dir,
+                        token.target,
+                        resource,
+                        css=is_css,
+                        html_css=is_html_css,
+                    ),
                 )
             )
     rewritten = text
@@ -325,6 +602,7 @@ def rewrite_published_resources(book_dir, source, text):
             raise ValueError(f"overlapping resource tokens in {source.relative_to(book_dir)}")
         rewritten = rewritten[:start] + replacement + rewritten[end:]
         next_start = start
+    resources.update(css_dependencies.resources)
     return rewritten, resources
 
 def rewrite_published_sources(book_dir, items):
