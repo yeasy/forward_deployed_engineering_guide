@@ -67,7 +67,6 @@ jobs:
       - name: Build release PDF and HTML
         env:
           SAFE_TAG_NAME: ${{ steps.tag.outputs.SAFE_TAG_NAME }}
-          CHROME_BIN: ${{ steps.setupchrome.outputs.chrome-path }}
         run: |
           mkdir -p dist
           mdpress build --format pdf --output "dist/forward_deployed_engineering_guide-${SAFE_TAG_NAME}.pdf"
