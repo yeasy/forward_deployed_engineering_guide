@@ -119,7 +119,7 @@ class ReleaseWorkflowTests(unittest.TestCase):
             self.assertIn("permissions:\n      contents: read", build, name)
             for marker in (
                 "python3 -m unittest discover",
-                "MDPRESS_SHA256",
+                "checksums.txt",
                 "PANDOC_SHA256",
                 "sha256sum -c -",
                 "npm ci --prefix tools/mermaid --ignore-scripts",
