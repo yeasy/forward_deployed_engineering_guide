@@ -134,8 +134,8 @@ class ReleaseWorkflowTests(unittest.TestCase):
             self.assertNotIn("continue-on-error: true", text)
         package = json.loads((ROOT / "tools/mermaid/package.json").read_text(encoding="utf-8"))
         lock = json.loads((ROOT / "tools/mermaid/package-lock.json").read_text(encoding="utf-8"))
-        self.assertEqual(package["dependencies"]["@mermaid-js/mermaid-cli"], "10.9.1")
-        self.assertEqual(lock["packages"][""]["dependencies"]["@mermaid-js/mermaid-cli"], "10.9.1")
+        self.assertEqual(package["dependencies"]["@mermaid-js/mermaid-cli"], "11.16.0")
+        self.assertEqual(lock["packages"][""]["dependencies"]["@mermaid-js/mermaid-cli"], "11.16.0")
 
     def test_release_is_attested_and_write_permissions_are_isolated(self):
         auto = self.text("auto-release.yml")
