@@ -13,6 +13,7 @@ jobs:
     permissions:
       contents: read
     runs-on: ubuntu-24.04
+    timeout-minutes: 30
     env:
       BOOK_TITLE: 前线部署工程实践指南
     steps:
