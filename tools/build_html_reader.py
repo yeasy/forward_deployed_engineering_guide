@@ -598,7 +598,7 @@ def markdown_resource_tokens(text):
             ResourceToken(
                 *match.span(1),
                 target,
-                context="markdown",
+                context="markdown+lists_without_preceding_blankline",
                 quote="<" if target.startswith("<") and target.endswith(">") else "",
             )
         )
@@ -611,7 +611,7 @@ def markdown_resource_tokens(text):
             ResourceToken(
                 *match.span(2),
                 target,
-                context="markdown",
+                context="markdown+lists_without_preceding_blankline",
                 quote="<" if target.startswith("<") and target.endswith(">") else "",
             ),
         )
@@ -1104,7 +1104,7 @@ def main():
         out_tmp = temporary / "reader.html"
         tmp_md.write_text(combined, encoding="utf-8")
         tpl.write_text(TEMPLATE, encoding="utf-8")
-        cmd = ["pandoc", str(tmp_md), "-f", "markdown", "-t", "html5",
+        cmd = ["pandoc", str(tmp_md), "-f", "markdown+lists_without_preceding_blankline", "-t", "html5",
                "--standalone", "--embed-resources", "--mathml",
                "--resource-path", str(book_dir),
                "--template", str(tpl), "--metadata", f"title={a.title}", "-o", str(out_tmp)]
