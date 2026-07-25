@@ -598,7 +598,7 @@ def markdown_resource_tokens(text):
             ResourceToken(
                 *match.span(1),
                 target,
-                context="markdown+lists_without_preceding_blankline",
+                context="markdown",
                 quote="<" if target.startswith("<") and target.endswith(">") else "",
             )
         )
@@ -611,7 +611,7 @@ def markdown_resource_tokens(text):
             ResourceToken(
                 *match.span(2),
                 target,
-                context="markdown+lists_without_preceding_blankline",
+                context="markdown",
                 quote="<" if target.startswith("<") and target.endswith(">") else "",
             ),
         )
