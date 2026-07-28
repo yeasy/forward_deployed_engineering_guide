@@ -2,7 +2,7 @@
 
 FDE 不是单个“万能工程师”的神话，而是一种组织能力：把真实业务现场、产品平台、工程交付、可靠运行和专业伦理连接成可复制的工作系统。随着 AI 采用扩大、数据平台进入更多企业流程，但试点进入核心流程的成熟度仍不均衡，FDE 的价值不再只是快速完成一个客户项目，而是帮助组织识别可规模化的部署模式、把现场经验反馈到产品，并让客户团队最终能够独立运行。
 
-截至 2026-05-18 的公开岗位说明给出了组织能力的共同信号：从研究突破到生产系统的转化可参考 [OpenAI 的 FDE 岗位说明](https://openai.com/careers/forward-deployed-engineer-nyc/)，嵌入战略客户并把可复用部署模式反馈给产品工程可参考 [Anthropic 的 FDE 岗位说明](https://www.anthropic.com/careers/jobs/4985877008)，招聘标准、培养框架、生产卓越和平台能力则可参考 [Scale AI 的 FDE 管理岗位说明](https://scale.com/careers/4690504005)。这些岗位说明共同显示 FDE 能力模型必须同时覆盖工程深度、业务理解、现场判断、产品抽象和组织学习；本书据此提出后续组织建议。
+公开岗位说明给出了组织能力的共同信号（快照日期见[快变事实核验表](../appendix/volatile_facts.md)）：从研究突破到生产系统的转化可参考 [OpenAI 的 FDE 岗位说明](https://openai.com/careers/forward-deployed-engineer-nyc/)，嵌入战略客户并把可复用部署模式反馈给产品工程可参考 [Anthropic 的 FDE 岗位说明](https://job-boards.greenhouse.io/anthropic)，招聘标准、培养框架、生产卓越和平台能力则可参考 [Scale AI 的 FDE 管理岗位说明](https://scale.com/careers/4690504005)。这些岗位说明共同显示 FDE 能力模型必须同时覆盖工程深度、业务理解、现场判断、产品抽象和组织学习；本书据此提出后续组织建议。
 
 ```mermaid
 flowchart LR

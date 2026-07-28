@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import re
 import sys
+from datetime import date, datetime, timedelta
 from pathlib import Path
 from urllib.parse import unquote, urlparse
 
@@ -35,6 +36,80 @@ HTML_TARGET_RE = re.compile(
     re.IGNORECASE,
 )
 FENCE_RE = re.compile(r"^\s{0,3}(`{3,}|~{3,})")
+
+VOLATILE_FACTS = ROOT / "appendix/volatile_facts.md"
+# The ledger's own TTL is read from its header rather than hardcoded here: this
+# book cites mostly standards and specs, which move far slower than the
+# product-and-pricing surface a sibling book tracks, so pinning it to a sibling's
+# cadence would fire the gate on material that provably cannot have moved — and
+# a gate that cries wolf teaches the maintainer to bump the date without looking.
+VOLATILE_TTL_BOUNDS = (30, 60)
+
+
+def check_volatile_facts(filepath=VOLATILE_FACTS, today=None):
+    """Fail the build once the dated snapshot of volatile external facts expires."""
+    path = Path(filepath)
+    current_date = today or date.today()
+    issues = []
+
+    try:
+        content = path.read_text(encoding="utf-8")
+    except OSError as exc:
+        return [f"{path} [Volatile facts] Cannot read ledger: {exc}"]
+
+    metadata = re.search(
+        r"`verified_at`:\s*(\d{4}-\d{2}-\d{2})\s*·\s*"
+        r"`expires_at`:\s*(\d{4}-\d{2}-\d{2})\s*·\s*"
+        r"`ttl_days`:\s*(\d+)",
+        content,
+    )
+    if metadata is None:
+        return [
+            f"{path} [Volatile facts] Missing verified_at, expires_at, or ttl_days metadata."
+        ]
+
+    try:
+        verified_at = datetime.strptime(metadata.group(1), "%Y-%m-%d").date()
+        expires_at = datetime.strptime(metadata.group(2), "%Y-%m-%d").date()
+        ttl_days = int(metadata.group(3))
+    except ValueError as exc:
+        return [f"{path} [Volatile facts] Invalid metadata: {exc}"]
+
+    low, high = VOLATILE_TTL_BOUNDS
+    if not low <= ttl_days <= high:
+        issues.append(
+            f"{path} [Volatile facts] ttl_days must be between {low} and {high}, got {ttl_days}."
+        )
+    if expires_at - verified_at != timedelta(days=ttl_days):
+        issues.append(
+            f"{path} [Volatile facts] expires_at must be verified_at plus ttl_days"
+            f" ({ttl_days} days); got {verified_at} to {expires_at}."
+        )
+    if verified_at > current_date:
+        issues.append(
+            f"{path} [Volatile facts] verified_at is in the future: {verified_at}."
+        )
+    if current_date > expires_at:
+        issues.append(
+            f"{path} [Volatile facts] Snapshot expired on {expires_at}; recheck the"
+            " authoritative entry points before bumping the date."
+        )
+
+    statuses = re.findall(
+        r"<!--\s*volatile-status:\s+id=[^\s]+\s+status=([^\s]+)\s*-->",
+        content,
+    )
+    if not statuses:
+        issues.append(f"{path} [Volatile facts] Missing volatile-status marker.")
+    for status in statuses:
+        if status == "open-conflict":
+            issues.append(f"{path} [Volatile facts] Ledger has an unresolved conflict.")
+        elif status not in {"current", "resolved-conflict"}:
+            issues.append(
+                f"{path} [Volatile facts] Unsupported volatile-status: {status}."
+            )
+
+    return issues
 
 
 def should_skip(path: Path) -> bool:
@@ -187,6 +262,7 @@ def main() -> int:
         issues.extend(check_fences(path, text))
         issues.extend(check_links(path, text))
     issues.extend(check_summary_links())
+    issues.extend(check_volatile_facts())
 
     unique_issues = sorted(set(issues))
     if unique_issues:
