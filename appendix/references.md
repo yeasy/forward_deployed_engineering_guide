@@ -69,7 +69,7 @@
 12. [Great Expectations 文档](https://docs.greatexpectations.io/)
 13. [Open Data Contract Standard](https://bitol-io.github.io/open-data-contract-standard/v3.1.0/)
 14. [Ragas Metrics](https://docs.ragas.io/en/stable/concepts/metrics/)
-15. [Model Context Protocol Specification 2025-11-25](https://modelcontextprotocol.io/specification/2025-11-25)
+15. [Model Context Protocol Specification 2026-07-28](https://modelcontextprotocol.io/specification/2026-07-28)
 16. [Palantir Object edits and materializations](https://www.palantir.com/docs/foundry/object-edits/overview)
 
 ### 安全、合规与供应链
@@ -119,7 +119,7 @@
 15. [OpenAI File Search tool](https://platform.openai.com/docs/guides/tools-file-search/)
 16. [OpenAI Data controls in the platform](https://platform.openai.com/docs/guides/your-data)
 17. [OpenAI Agents SDK](https://platform.openai.com/docs/guides/agents-sdk/)
-18. [Model Context Protocol specification 2025-11-25](https://modelcontextprotocol.io/specification/2025-11-25)
+18. [Model Context Protocol specification 2026-07-28](https://modelcontextprotocol.io/specification/2026-07-28)
 19. [Model Context Protocol governance](https://modelcontextprotocol.io/community/governance)
 20. [Linux Foundation Agentic AI Foundation announcement](https://www.linuxfoundation.org/press/linux-foundation-announces-the-formation-of-the-agentic-ai-foundation)
 21. [Ragas Documentation](https://docs.ragas.io/)
