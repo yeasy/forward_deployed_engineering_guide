@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import re
 import unittest
+from datetime import date
 from pathlib import Path
 
 
@@ -48,8 +49,24 @@ class ClaimLedgerTests(unittest.TestCase):
             self.assertIn(row["type"], ALLOWED_TYPES)
             self.assertTrue(row["claim"])
             self.assertRegex(row["source"], r"\[.+\]\(https://[^)]+\)")
-            self.assertRegex(row["verified"], r"^2026-07-10$")
             self.assertTrue(row["boundary"])
+
+    def test_verified_at_is_a_real_past_iso_date(self, today: date | None = None) -> None:
+        """`verified_at` must be re-earned, not re-typed.
+
+        This deliberately does NOT pin a literal date. Pinning one makes the test
+        fail on every legitimate re-verification, which teaches whoever is refreshing
+        the ledger to edit the number until the suite goes green — the opposite of
+        what the stamp is for. It also does not expire: per the ledger's own header,
+        this table is a historical record and `appendix/volatile_facts.md` is the
+        clock. What is actually checkable here is that each stamp is a real ISO date
+        that has already happened.
+        """
+        today = today or date.today()
+        for row in ledger_rows(self.text()):
+            self.assertRegex(row["verified"], r"^\d{4}-\d{2}-\d{2}$", row["id"])
+            stamped = date.fromisoformat(row["verified"])
+            self.assertLessEqual(stamped, today, f"{row['id']} is stamped in the future")
 
     def test_every_case_chapter_claim_id_is_in_ledger_and_vice_versa(self):
         rows = ledger_rows(self.text())
