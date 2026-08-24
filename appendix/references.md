@@ -12,7 +12,7 @@
 6. [Accenture 与 Microsoft FDE practice 公告](https://newsroom.accenture.com/news/2026/accenture-launches-microsoft-forward-deployed-engineering-practice-to-help-organizations-scale-ai-across-the-enterprise)
 7. [a16z Services-Led Growth](https://a16z.com/services-led-growth/)
 8. [Docker 从入门到实践](https://yeasy.gitbook.io/docker_practice/)
-9. [《北京市加快智能体引领发展若干措施》（京发改〔2026〕1185号）](https://www.beijing.gov.cn/zhengce/zhengcefagui/202607/t20260723_4781085.html)
+9. [《北京市加快智能体引领发展若干措施》（京发改〔2026〕1185 号）](https://www.beijing.gov.cn/zhengce/zhengcefagui/202607/t20260723_4781085.html)
 
 ### 产品发现、工作流与交付管理
 
