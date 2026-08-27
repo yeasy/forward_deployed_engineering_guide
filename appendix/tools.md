@@ -68,7 +68,7 @@
 
 [Amazon Bedrock](https://docs.aws.amazon.com/bedrock/) 在 AWS 区域内提供多家模型托管、Guardrails、Knowledge Bases 与 Agents，对在 AWS 落地数据与权限的项目集成成本较低。
 
-[Google Vertex AI](https://cloud.google.com/vertex-ai/docs) 在 GCP 上整合 Gemini 系列、模型花园、Pipelines 与 Model Registry，适合需要 TPU、BigQuery 数据或与 Google Workspace 工作流深度集成的场景。
+[Google Gemini Enterprise Agent Platform](https://docs.cloud.google.com/gemini-enterprise-agent-platform)（原 Vertex AI）在 GCP 上整合 Gemini 系列、模型花园、Pipelines 与 Model Registry，适合需要 TPU、BigQuery 数据或与 Google Workspace 工作流深度集成的场景。
 
 ### 模型与实验治理
 
