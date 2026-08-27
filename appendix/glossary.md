@@ -74,7 +74,7 @@ SPACE 是一个开发者生产力度量框架，覆盖 Satisfaction and well-bei
 
 ### SBOM
 
-SBOM 是 Software Bill of Materials 的缩写，即软件物料清单。它记录软件组件、版本、供应商、依赖关系、许可证和标识信息。根据 [CISA SBOM](https://www.cisa.gov/sbom) 的定义，SBOM 有助于组织理解软件供应链风险和漏洞影响面。
+SBOM 是 Software Bill of Materials 的缩写，即软件物料清单。它记录软件组件、版本、供应商、依赖关系、许可证和标识信息。根据 [CISA SBOM](https://www.cisa.gov/topics/information-communications-technology-supply-chain-security/sbom) 的定义，SBOM 有助于组织理解软件供应链风险和漏洞影响面。
 
 ### ML-BOM / AIBOM
 

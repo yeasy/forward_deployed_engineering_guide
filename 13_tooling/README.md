@@ -2,7 +2,7 @@
 
 FDE 项目的交付速度，最终取决于团队能否把重复工作沉淀为平台能力。工具不是越多越好；工具生态的目标，是让开发者、数据工程师、运维、安全和业务团队在同一套事实、流程和边界上协作。开发者门户负责回答“系统在哪里、谁负责、如何接入”；交付平台负责把最佳实践固化为模板和流水线；工作流与数据编排负责让长周期任务可恢复、可观察；AI 工程工具链负责把模型、检索、评测和部署连接成闭环；平台治理负责在自助能力和风险控制之间建立秩序。
 
-工具生态可以按能力边界组织：用 [Backstage Software Catalog](https://backstage.io/docs/features/software-catalog/) 汇聚服务元数据、所有权和插件能力；用 [Dagger](https://docs.dagger.io/) 把交付流程抽象为可复用的代码化函数和模块；用 [Temporal](https://docs.temporal.io/) 处理故障后可从中断处恢复的 durable execution；用 [Airflow](https://airflow.apache.org/docs/apache-airflow/stable/core-concepts/overview.html) 和 [Dagster](https://docs.dagster.io/) 分别覆盖任务 DAG 与数据资产视角；用 [LangGraph](https://docs.langchain.com/oss/python/langgraph/durable-execution)、[LlamaIndex](https://developers.llamaindex.ai/python/framework/)、[Ray](https://docs.ray.io/en/latest/ray-overview/index.html) 与 [MLflow](https://mlflow.org/docs/latest/ml/tracking/) 覆盖 agent 编排、上下文增强、分布式计算和模型生命周期管理。
+工具生态可以按能力边界组织：用 [Backstage Software Catalog](https://backstage.io/docs/features/software-catalog/) 汇聚服务元数据、所有权和插件能力；用 [Dagger](https://docs.dagger.io/) 把交付流程抽象为可复用的代码化函数和模块；用 [Temporal](https://docs.temporal.io/) 处理故障后可从中断处恢复的 durable execution；用 [Airflow](https://airflow.apache.org/docs/apache-airflow/stable/core-concepts/overview.html) 和 [Dagster](https://docs.dagster.io/) 分别覆盖任务 DAG 与数据资产视角；用 [LangGraph](https://docs.langchain.com/oss/python/langgraph/persistence)、[LlamaIndex](https://developers.llamaindex.ai/python/framework/)、[Ray](https://docs.ray.io/en/latest/ray-overview/index.html) 与 [MLflow](https://mlflow.org/docs/latest/ml/tracking/) 覆盖 agent 编排、上下文增强、分布式计算和模型生命周期管理。
 
 ```mermaid
 flowchart LR

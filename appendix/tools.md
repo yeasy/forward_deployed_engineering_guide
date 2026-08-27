@@ -46,15 +46,15 @@
 
 ### 向量检索与知识索引
 
-[Milvus](https://milvus.io/docs/overview.md)、[Weaviate](https://weaviate.io/developers/weaviate)、[Qdrant](https://qdrant.tech/documentation/) 和 [pgvector](https://github.com/pgvector/pgvector) 可用于构建企业 RAG 的向量检索层。选型时不要只看 benchmark：还要看 ACL 过滤、元数据 schema、备份恢复、混合检索、重排、租户隔离和运维团队已有数据库能力。
+[Milvus](https://milvus.io/docs/overview.md)、[Weaviate](https://docs.weaviate.io/weaviate)、[Qdrant](https://qdrant.tech/documentation/) 和 [pgvector](https://github.com/pgvector/pgvector) 可用于构建企业 RAG 的向量检索层。选型时不要只看 benchmark：还要看 ACL 过滤、元数据 schema、备份恢复、混合检索、重排、租户隔离和运维团队已有数据库能力。
 
 ### 评测与回归
 
-[OpenAI Evals](https://platform.openai.com/docs/guides/evals)、[Ragas](https://docs.ragas.io/)、[promptfoo](https://www.promptfoo.dev/docs/intro/)、[Langfuse](https://langfuse.com/docs)、[Arize Phoenix](https://docs.arize.com/phoenix) 和 [Braintrust](https://www.braintrust.dev/docs) 可用于构建 LLM/RAG/Agent 的离线评测、trace 分析和回归门禁。FDE 项目应优先定义任务样本、评分函数和失败处置，再选择工具。
+[OpenAI Evals](https://developers.openai.com/api/docs/guides/evals)、[Ragas](https://docs.ragas.io/)、[promptfoo](https://www.promptfoo.dev/docs/intro/)、[Langfuse](https://langfuse.com/docs)、[Arize Phoenix](https://arize.com/docs/phoenix) 和 [Braintrust](https://www.braintrust.dev/docs) 可用于构建 LLM/RAG/Agent 的离线评测、trace 分析和回归门禁。FDE 项目应优先定义任务样本、评分函数和失败处置，再选择工具。
 
 ### Guardrails 与运行时保护
 
-[NVIDIA NeMo Guardrails](https://docs.nvidia.com/nemo/guardrails/)、[Llama Guard](https://www.llama.com/docs/model-cards-and-prompt-formats/llama-guard-3/)、[Amazon Bedrock Guardrails](https://docs.aws.amazon.com/bedrock/latest/userguide/guardrails.html) 和 [Azure AI Content Safety](https://learn.microsoft.com/azure/ai-services/content-safety/) 可用于内容安全、拒答、策略约束和高风险输出拦截。它们不能替代身份、权限和审计，只能作为模型输入输出与工具执行边界上的一层控制。
+[NVIDIA NeMo Guardrails](https://docs.nvidia.com/nemo/guardrails/about-nemo-guardrails-library/overview)、[Llama Guard](https://developer.meta.com/ai/docs/model-cards-and-prompt-formats/llama-guard-3/)、[Amazon Bedrock Guardrails](https://docs.aws.amazon.com/bedrock/latest/userguide/guardrails.html) 和 [Azure AI Content Safety](https://learn.microsoft.com/azure/ai-services/content-safety/) 可用于内容安全、拒答、策略约束和高风险输出拦截。它们不能替代身份、权限和审计，只能作为模型输入输出与工具执行边界上的一层控制。
 
 ### AI Gateway 与模型路由
 
@@ -62,7 +62,7 @@
 
 ### AI 平台与模型 API
 
-[Claude / Anthropic API](https://docs.anthropic.com/) 提供 Claude 系列模型、工具调用和长上下文能力，可作为对内 agent、客户面应用与离线评测的统一入口。涉及医疗、隐私或受监管数据时，不应把 DPA/BAA 视为平台默认能力；应按 [Anthropic BAA 说明](https://support.claude.com/en/articles/8114513-business-associate-agreements-baa-for-commercial-customers)核对产品面、API 功能、HIPAA-ready 配置、ZDR 要求和第三方集成排除项。
+[Claude / Anthropic API](https://platform.claude.com/docs/en/home) 提供 Claude 系列模型、工具调用和长上下文能力，可作为对内 agent、客户面应用与离线评测的统一入口。涉及医疗、隐私或受监管数据时，不应把 DPA/BAA 视为平台默认能力；应按 [Anthropic BAA 说明](https://support.claude.com/en/articles/8114513-business-associate-agreements-baa-for-commercial-customers)核对产品面、API 功能、HIPAA-ready 配置、ZDR 要求和第三方集成排除项。
 
 [Microsoft Foundry](https://learn.microsoft.com/en-us/azure/foundry/)（原 Azure AI Foundry，2025-11 更名）在 Azure 上集成模型目录、agent、评测与责任 AI 工具，适合已在 Microsoft 生态、需要私网与合规审计的客户。
 

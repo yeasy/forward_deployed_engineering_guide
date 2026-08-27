@@ -8,7 +8,7 @@
 
 | 小节 | 行业场景 | 主要工程问题 | 公开案例来源 |
 | --- | --- | --- | --- |
-| 14.1 | 政府与公共部门 | 政策、服务、用户反馈和敏捷治理协同 | [GOV.UK Service Manual](https://www.gov.uk/service-manual/agile)、[GDS](https://gds.blog.gov.uk/2018/04/26/gov-uk-a-journey-in-scaling-agile/) |
+| 14.1 | 政府与公共部门 | 政策、服务、用户反馈和敏捷治理协同 | [GOV.UK Service Manual](https://www.gov.uk/service-manual/agile-delivery/agile-government-services-introduction)、[GDS](https://gds.blog.gov.uk/2018/04/26/gov-uk-a-journey-in-scaling-agile/) |
 | 14.2 | 金融与风控 | 实时评分、误报控制、规则与模型协作 | [Visa](https://usa.visa.com/about-visa/newsroom/press-releases.releaseId.20661.html)、[Mastercard](https://www.mastercard.com/news/press/2024/february/mastercard-supercharges-consumer-protection-with-gen-ai/) |
 | 14.3 | 制造与供应链 | 数字孪生、物料流、工艺变更和可追溯 | [Siemens 客户案例](https://resources.sw.siemens.com/en-US/case-study-roj/) |
 | 14.4 | 医疗与生命科学 | 临床数据、AI 验证、药物研发和安全报告 | [Mayo Clinic](https://www.mayo.edu/research/centers-programs/robert-d-patricia-e-kern-center-science-health-care-delivery/research-activities/clinical-data-science)、[Pfizer](https://www.pfizer.com/news/press-release/press-release-detail/cytoreason-announces-expanded-collaboration-deal-pfizer) |
