@@ -80,7 +80,7 @@ FDE 已从少数公司的组织实践扩展为企业 AI 和数字化转型的重
 
 第四部分“实战篇：规模化与行业落地”讨论如何把一次交付变成可复用能力。它包括工具生态、行业案例、组织能力、职业发展和未来趋势。
 
-附录包括术语表、参考文献、工具索引、[交付证据包模板](appendix/templates.md)、[综合实战](appendix/capstone.md)和[第十四章声明账本](appendix/claim_ledger.md)，便于读者在阅读、审校和项目实践中快速查阅、验证与复用。
+附录包括术语表、参考文献、工具索引、[交付证据包模板](appendix/templates.md)、[综合实战](appendix/capstone.md)、[第十四章声明账本](appendix/claim_ledger.md)和[快变事实核验表](appendix/volatile_facts.md)，便于读者在阅读、审校和项目实践中快速查阅、验证与复用。
 
 ## 在线阅读
 

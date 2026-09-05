@@ -11,7 +11,7 @@ Lakehouse、Delta Lake、Apache Iceberg、dbt、OpenLineage、OpenMetadata、Gre
 | Owner 与消费者 | producer、data owner、on-call、核心消费者明确 | 契约、资产目录页、通知组 | 不允许进入产品层 |
 | 契约与变更 | Schema、语义、SLA、质量、安全、兼容窗口版本化 | contract YAML、RFC、回归查询 | 进入 draft/review，不允许 cutover |
 | 管道与重跑 | DAG/job 有幂等键、重跑窗口、隔离表、补偿步骤 | 管道设计卡、runbook、审计记录 | 禁止自动触发下游动作 |
-| 质量与血缘 | P0/P1 可阻断，upstream/downstream 和字段级映射可查 | 质量报告、血缘图、资产页 | 标注 stale 或暂停发布 |
+| 质量与血缘 | P0 阻断、P1 降级，upstream/downstream 和字段级映射可查 | 质量报告、血缘图、资产页 | 标注 stale 或暂停发布 |
 | 语义与指标 | 指标 owner、公式、时间口径、golden query 和版本历史明确 | Metric RFC、saved query、回归结果 | 不允许应用自写口径 |
 | RAG/索引数据产品 | 索引可重建，embedding/index/reranker/chunk policy 版本化，ACL、用途限制与删除传播可验证 | 索引构建记录、eval dataset、trace 字段、ACL 负例 | 回滚到上一索引、限制可见范围或 fail closed |
 | 运营动作 | 状态机、动作权限、审批、审计白名单、反馈分层和用途检查明确 | 动作矩阵、状态转移契约、审计表、反馈 schema | 只展示或人工确认，不自动执行 |
