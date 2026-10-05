@@ -97,7 +97,7 @@
 21. [SLSA v1.2 Source Requirements](https://slsa.dev/spec/v1.2/source-requirements)
 22. [SLSA v1.2 Build Provenance](https://slsa.dev/spec/v1.2/build-provenance)
 23. [Sigstore Cosign Verification](https://docs.sigstore.dev/cosign/verifying/verify/)
-24. [CISA 2025 Minimum Elements for SBOM](https://www.cisa.gov/resources-tools/resources/2025-minimum-elements-software-bill-materials-sbom)
+24. [CISA 2026 Minimum Elements for SBOM](https://www.cisa.gov/resources-tools/resources/2026-minimum-elements-software-bill-materials-sbom)
 25. [CISA Software Bill of Materials for AI - Minimum Elements](https://www.cisa.gov/resources-tools/resources/software-bill-materials-ai-minimum-elements)
 
 ### AI、RAG、Agent 与评测
