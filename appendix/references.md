@@ -160,7 +160,7 @@
 17. [Azure AI Content Safety](https://learn.microsoft.com/azure/ai-services/content-safety/)
 18. [LiteLLM Documentation](https://docs.litellm.ai/)
 19. [Portkey Documentation](https://portkey.ai/docs)
-20. [Envoy AI Gateway Documentation](https://aigateway.envoyproxy.io/docs/)
+20. [Agent Router Documentation（原 Envoy AI Gateway）](https://theagentrouter.ai/docs/)
 21. [Kong AI Gateway Documentation](https://developer.konghq.com/ai-gateway/)
 
 ### AI 算力与推理平台
