@@ -1,6 +1,6 @@
 ## 14.7 本章小结
 
-第十四章不再把行业差异停留在约束速览，而是把五类行业拆成可复用但不可照搬的现场案例。共同点是：团队必须进入真实现场，理解数据从哪里来、决策由谁负责、系统失败会影响谁，并把软件能力嵌入现有流程。差异点是：公共部门可从 [GOV.UK](https://www.gov.uk/service-manual/agile-delivery/agile-government-services-introduction) 看到服务责任和可审计治理的重要性；金融风控可从 [Visa](https://usa.visa.com/about-visa/newsroom/press-releases.releaseId.20661.html) 与 [Mastercard](https://www.mastercard.com/us/en/news-and-trends/press/2024/february/mastercard-supercharges-consumer-protection-with-gen-ai.html) 案例看到毫秒级决策和误报控制的压力；制造场景可从 [Siemens ROJ](https://resources.sw.siemens.com/en-US/case-study-roj/) 案例看到设备和物料连续追踪的价值；医疗场景可从 [Mayo Clinic](https://www.mayo.edu/research/centers-programs/robert-d-patricia-e-kern-center-science-health-care-delivery/research-activities/clinical-data-science) 看到安全验证和临床责任的边界；关键基础设施则可从 [Ericsson DNB](https://www.ericsson.com/en/cases/2024/digital-nasional-berhad-intent-based-operations) 与[美国能源部](https://www.energy.gov/nepa/articles/cx-032183-cognitive-digital-twin-development-secure-and-resilient-smart-grid)材料看到韧性、安全和人工监督的要求。
+第十四章把行业差异从约束速览推进到五类可复用但不可照搬的现场案例。共同点是：团队必须进入真实现场，理解数据从哪里来、决策由谁负责、系统失败会影响谁，并把软件能力嵌入现有流程。差异点是：公共部门可从 [GOV.UK](https://www.gov.uk/service-manual/agile-delivery/agile-government-services-introduction) 看到服务责任和可审计治理的重要性；金融风控可从 [Visa](https://usa.visa.com/about-visa/newsroom/press-releases.releaseId.20661.html) 与 [Mastercard](https://www.mastercard.com/us/en/news-and-trends/press/2024/february/mastercard-supercharges-consumer-protection-with-gen-ai.html) 案例看到毫秒级决策和误报控制的压力；制造场景可从 [Siemens ROJ](https://resources.sw.siemens.com/en-US/case-study-roj/) 案例看到设备和物料连续追踪的价值；医疗场景可从 [Mayo Clinic](https://www.mayo.edu/research/centers-programs/robert-d-patricia-e-kern-center-science-health-care-delivery/research-activities/clinical-data-science) 看到安全验证和临床责任的边界；关键基础设施则可从 [Ericsson DNB](https://www.ericsson.com/en/cases/2024/digital-nasional-berhad-intent-based-operations) 与[美国能源部](https://www.energy.gov/nepa/articles/cx-032183-cognitive-digital-twin-development-secure-and-resilient-smart-grid)材料看到韧性、安全和人工监督的要求。
 
 ### 14.7.1 案例复用条件表
 
@@ -28,6 +28,6 @@ flowchart TD
     F --> G["持续运营"]
 ```
 
-这些案例最重要的结论是：前线部署工程不是“把平台卖进客户现场”，而是把可运行系统与业务责任共同交付。工程师需要能够写代码、看数据、读流程、问风险，也要知道何时不自动化、何时保留人工确认、何时拒绝用缺乏证据的收益承诺推动上线。行业案例可以提供模式，但不能替代本地验证；每一次部署都应重新定义指标、风险、回退和维护责任。
+这些案例的主要结论是：前线部署工程要把可运行系统与业务责任共同交付，而不是“把平台卖进客户现场”。工程师需要能够写代码、看数据、读流程、问风险，也要知道何时不自动化、何时保留人工确认、何时拒绝用缺乏证据的收益承诺推动上线。行业案例可以提供模式，但不能替代本地验证；每一次部署都应重新定义指标、风险、回退和维护责任。
 
 任何案例复用前，都要把公开证据和本书推断分开，并写出 owner、上线阈值、回滚条件、复审触发和风险接受人。高影响自动化不得只因相似案例存在就跳过本地人工授权边界。

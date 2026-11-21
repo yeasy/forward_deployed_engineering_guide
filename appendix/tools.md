@@ -18,7 +18,7 @@
 
 ### GitOps 与交付控制
 
-[Argo CD](https://argo-cd.readthedocs.io/) 和 [Flux](https://fluxcd.io/flux/) 适合把 Kubernetes 应用状态从 Git、Helm 或 OCI 制品拉取到集群内持续调和。它们的价值不是“自动部署”本身，而是让客户环境的期望状态、变更历史、回滚路径和审批证据统一。
+[Argo CD](https://argo-cd.readthedocs.io/) 和 [Flux](https://fluxcd.io/flux/) 适合把 Kubernetes 应用状态从 Git、Helm 或 OCI 制品拉取到集群内持续调和。除自动部署外，它们让客户环境的期望状态、变更历史、回滚路径和审批证据保持统一。
 
 ### 基础设施即代码
 
@@ -26,7 +26,7 @@
 
 ### 可复现流水线
 
-[Dagger](https://docs.dagger.io/) 将构建、测试、发布和运行任务表达为可编程流水线，适合需要跨本地、CI 和客户环境复现交付动作的团队。FDE 场景中，它可以减少“只在某个工程师机器上能跑”的交付风险。
+[Dagger](https://docs.dagger.io/) 将构建、测试、发布和运行任务表达为可编程流水线，适合需要跨本地、CI 和客户环境复现交付动作的团队。在 FDE 场景中，它可以减少“只在某个工程师机器上能跑”的交付风险。
 
 ### 可靠工作流
 
@@ -38,7 +38,7 @@
 
 ### 数据治理与质量
 
-[OpenLineage](https://openlineage.io/) 可用于标准化血缘事件。[OpenMetadata](https://docs.open-metadata.org/) 提供元数据、血缘、质量、所有权和治理能力。[Great Expectations](https://docs.greatexpectations.io/) 可用于表达和验证数据质量规则。它们共同服务于一个目标：让数据产品可解释、可追责、可变更。
+[OpenLineage](https://openlineage.io/) 可用于标准化血缘事件。[OpenMetadata](https://docs.open-metadata.org/) 提供元数据、血缘、质量、所有权和治理能力。[Great Expectations](https://docs.greatexpectations.io/) 可用于表达和验证数据质量规则。三者共同使数据产品可解释、可追责、可变更。
 
 ### AI 应用编排
 
@@ -46,7 +46,7 @@
 
 ### 向量检索与知识索引
 
-[Milvus](https://milvus.io/docs/overview.md)、[Weaviate](https://docs.weaviate.io/weaviate)、[Qdrant](https://qdrant.tech/documentation/) 和 [pgvector](https://github.com/pgvector/pgvector) 可用于构建企业 RAG 的向量检索层。选型时不要只看 benchmark：还要看 ACL 过滤、元数据 schema、备份恢复、混合检索、重排、租户隔离和运维团队已有数据库能力。
+[Milvus](https://milvus.io/docs/overview.md)、[Weaviate](https://docs.weaviate.io/weaviate)、[Qdrant](https://qdrant.tech/documentation/) 和 [pgvector](https://github.com/pgvector/pgvector) 可用于构建企业 RAG 的向量检索层。选型时除 benchmark 外，还应考察 ACL 过滤、元数据 schema、备份恢复、混合检索、重排、租户隔离和运维团队已有数据库能力。
 
 ### 评测与回归
 
