@@ -13,7 +13,7 @@
 | 14.3 | 制造与供应链 | 数字孪生、物料流、工艺变更和可追溯 | [Siemens 客户案例](https://resources.sw.siemens.com/en-US/case-study-roj/) |
 | 14.4 | 医疗与生命科学 | 临床数据、AI 验证、药物研发和安全报告 | [Mayo Clinic](https://www.mayo.edu/research/centers-programs/robert-d-patricia-e-kern-center-science-health-care-delivery/research-activities/clinical-data-science)、[Pfizer](https://www.pfizer.com/news/press-release/press-release-detail/cytoreason-announces-expanded-collaboration-deal-pfizer) |
 | 14.5 | 能源、通信与关键基础设施 | 自治网络、智能电网、韧性和人机协同 | [Ericsson DNB case](https://www.ericsson.com/en/cases/2024/digital-nasional-berhad-intent-based-operations)、[美国能源部](https://www.energy.gov/nepa/articles/cx-032183-cognitive-digital-twin-development-secure-and-resilient-smart-grid) |
-| 14.6 | 公开失败案例 | 演示与生产脱节、模型直驱高影响动作、部署一致性缺失 | [JNCI Watson/MD Anderson 文章](https://academic.oup.com/jnci/article/109/5/djx113/3847623)、[Zillow investor release](https://investors.zillowgroup.com/investors/news-and-events/news/news-details/2021/Zillow-Group-Reports-Third-Quarter-2021-Financial-Results--Shares-Plan-to-Wind-Down-Zillow-Offers-Operations/default.aspx?stream=business)、[Air Canada 裁决](https://decisions.civilresolutionbc.ca/crt/crtd/en/item/525448/index.do)、[SEC Knight Capital](https://www.sec.gov/files/litigation/admin/2013/34-70694.pdf) |
+| 14.6 | 公开失败案例 | 演示与生产脱节、模型直驱高影响动作、部署一致性缺失 | [JNCI Watson/MD Anderson 文章](https://academic.oup.com/jnci/article/109/5/djx113/3847623)、[Zillow SEC Form 8-K](https://www.sec.gov/Archives/edgar/data/1617640/000161764021000085/z-20211102.htm)、[Air Canada 裁决](https://decisions.civilresolutionbc.ca/crt/crtd/en/item/525448/index.do)、[SEC Knight Capital](https://www.sec.gov/files/litigation/admin/2013/34-70694.pdf) |
 
 ```mermaid
 flowchart LR
