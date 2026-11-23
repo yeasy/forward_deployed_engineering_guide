@@ -1,8 +1,8 @@
 # 前线部署工程实践指南
 
-从发现客户现场的问题，到用软件、数据与 AI 交付可运维、可接管的生产系统。
+从发现客户现场的问题，到交付可运维、可接管的生产系统。
 
-**[在 GitBook 阅读第一章 · FDE 的角色边界](https://yeasy.gitbook.io/forward_deployed_engineering_guide/di-yi-bu-fen-ru-men-pian-li-jie-fde/01_role)**
+**[在 GitBook 阅读第一章](https://yeasy.gitbook.io/forward_deployed_engineering_guide/di-yi-bu-fen-ru-men-pian-li-jie-fde/01_role)**
 
 [全书目录（GitHub）](https://github.com/yeasy/forward_deployed_engineering_guide/blob/main/SUMMARY.md) · [正式 PDF 和单文件 HTML（发布页）](https://github.com/yeasy/forward_deployed_engineering_guide/releases/latest)
 
