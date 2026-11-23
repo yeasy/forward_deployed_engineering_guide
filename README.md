@@ -1,21 +1,14 @@
-<div align="center">
-
 # 前线部署工程实践指南
 
-[![GitHub stars](https://img.shields.io/github/stars/yeasy/forward_deployed_engineering_guide?style=social)](https://github.com/yeasy/forward_deployed_engineering_guide)
-[![Release](https://img.shields.io/github/release/yeasy/forward_deployed_engineering_guide.svg)](https://github.com/yeasy/forward_deployed_engineering_guide/releases)
-[![Online Reading](https://img.shields.io/badge/在线阅读-GitBook-brightgreen)](https://yeasy.gitbook.io/forward_deployed_engineering_guide/)
-[![PDF](https://img.shields.io/badge/PDF-下载-orange)](https://github.com/yeasy/forward_deployed_engineering_guide/releases/latest)
+从发现客户现场的问题，到用软件、数据与 AI 交付可运维、可接管的生产系统。
 
-> 从现场问题发现到 AI 原生生产交付，系统掌握前线部署工程的方法、工具与实践。
+**[在 GitBook 阅读第一章 · FDE 的角色边界](https://yeasy.gitbook.io/forward_deployed_engineering_guide/di-yi-bu-fen-ru-men-pian-li-jie-fde/01_role)**
 
-<img src="cover.png" width="360" alt="前线部署工程实践指南封面配图">
+[全书目录（GitHub）](https://github.com/yeasy/forward_deployed_engineering_guide/blob/main/SUMMARY.md) · [正式 PDF 和单文件 HTML（发布页）](https://github.com/yeasy/forward_deployed_engineering_guide/releases/latest)
 
-</div>
+<img src="cover.png" width="210" alt="前线部署工程实践指南封面">
 
----
-
-## 本书定位
+## 关于本书
 
 Forward Deployed Engineering，简称 FDE，本书译作“前线部署工程”。它是指把工程师嵌入真实业务现场，用软件、数据、AI、平台和运营方法解决复杂组织问题的工程实践，有别于传统售前、外包实施或一次性顾问交付。FDE 的目标是把模糊问题转化为可运行、可观测、可治理、可持续演进的生产系统，交付物不止于方案文档。
 
@@ -27,99 +20,66 @@ FDE 已从少数公司的组织实践扩展为企业 AI 和数字化转型的重
 
 本书面向希望系统掌握 FDE 的工程师、技术负责人、产品经理、解决方案架构师、平台工程师、AI 应用开发者和企业数字化负责人。
 
-## 目标读者
+## 从哪里开始
 
-本书适合以下读者阅读：
+- **第一次接触 FDE** · 从[第一章 · FDE 的角色边界](https://yeasy.gitbook.io/forward_deployed_engineering_guide/di-yi-bu-fen-ru-men-pian-li-jie-fde/01_role)开始，先弄清 FDE 与售前、解决方案架构师及平台团队各自负责什么。
+- **即将进入客户现场** · 从[第二章 · 现场问题发现](https://yeasy.gitbook.io/forward_deployed_engineering_guide/di-yi-bu-fen-ru-men-pian-li-jie-fde/02_discovery)开始。选一条业务流程，记录现状与约束，写出第一轮试点要验证的假设。
+- **准备将试点转入生产** · 从[用户上线与运营切换](https://yeasy.gitbook.io/forward_deployed_engineering_guide/di-san-bu-fen-sheng-chan-pian-ai-yuan-sheng-xi-tong/11_production/11.4_launch)开始，制定分批切换计划，用[交付证据包模板](appendix/templates.md)检查数据、安全、LLMOps 和运维证据，以及回滚和接管的条件与负责人。
 
-1. 已具备软件工程基础，希望进入 FDE、解决方案工程、AI 交付、平台工程或企业技术咨询领域的工程师。
-2. 正在把 AI、数据平台、云原生平台或业务自动化系统落地到企业现场的技术负责人。
-3. 需要理解 FDE 与售前、咨询、SRE、平台工程、客户成功之间边界的管理者。
-4. 希望用开源工具构建可复制交付能力的团队，包括 Kubernetes、GitOps、IaC、OpenTelemetry、Backstage、Temporal、Dagster、LangGraph、LlamaIndex、MLflow 等生态使用者。
-5. 正在负责高安全、高合规、高复杂度现场交付的团队，例如金融、制造、医疗、能源、公共部门和供应链场景。
+想完整演练一次交付，可以用[综合实战](appendix/capstone.md)中的制造案例，从现场调研做起，交付一份可供客户接管评审的证据包。
 
-## 将学到什么
+<details>
 
-读完整书后，读者应能够形成四类能力。
+<summary>按角色选读</summary>
 
-第一，理解 FDE 的角色本质。读者将能区分 FDE、售前工程师、解决方案架构师、专业服务、平台工程师、SRE、AI 工程师之间的责任边界，理解 FDE 的核心为何是现场发现、工程交付、生产价值和产品反哺。
+- **FDE 与解决方案工程师** · 从[角色边界](01_role/README.md)读到第 4 章，形成现场发现、架构决策和交付计划。再读第 7–8、10–12 章，按附录模板准备上线证据。
+- **平台与 DevOps 工程师** · 从[云原生运行底座](05_cloud_native/README.md)开始，依次读第 5–6、8、12–13 章，为同一制品设计环境提升、回滚和运维方案。
+- **AI 应用工程师** · 从[数据源接入与契约](07_data/7.1_contract.md)开始，再读第 8–12 和第 16 章，为 RAG 或 Agent 定义数据权限、评测门槛和人工接管条件。
+- **技术负责人和产品负责人** · 先读[角色边界](01_role/README.md)和[交付节奏与团队协作](04_delivery/README.md)，再结合第 11–12、14–16 章和附录模板，明确交付责任、接管标准和产品化机会。
 
-第二，掌握从问题到系统的交付方法。书中将讲解如何进入客户现场，识别真实瓶颈，建立领域语言，设计成功指标，拆分原型、试点和生产系统，并管理范围、风险、变更和知识转移。
-
-第三，建立生产级工程底座。读者将学习容器与 Kubernetes、GitOps、基础设施即代码、CI/CD、软件供应链安全、数据产品、语义层、零信任、可观测性、SLO、事件响应等核心能力，并理解它们在 FDE 项目中的实际作用。
-
-第四，掌握 AI 原生 FDE 实践。书中将覆盖 LLM、RAG、Agent、评测、LLMOps、提示工程、工具调用、模型部署、安全防护和人机协同边界，重点解释如何把 AI 能力接入客户数据、系统、权限和真实工作流。
-
-## 阅读路径
-
-下表给出快速路径，不能据此跳过章节间的依赖。真实项目进入生产前，应回查数据、安全、LLMOps、运维和[交付证据包模板](appendix/templates.md)，确认关键证据、owner、回滚和接管条件齐全。
-
-| 读者 | 建议章节 | 阅读重点 |
-|---|---|---|
-| FDE / 解决方案工程师 | 1 -> 2 -> 3 -> 4 -> 7 -> 8 -> 10 -> 11 -> 12 -> 附录模板 | 角色边界、现场发现、架构取舍、数据与安全、生产上线、运维闭环 |
-| 平台 / DevOps 工程师 | 5 -> 6 -> 8 -> 12 -> 13 | 云原生、GitOps、供应链安全、可观测性、平台化 |
-| AI 应用工程师 | 7 -> 8 -> 9 -> 10 -> 11 -> 12 -> 16 -> 附录模板 | 数据接入、权限与安全、RAG、Agent、评测、LLMOps、AI FDE |
-| 技术负责人 / 产品负责人 | 1 -> 4 -> 11 -> 12 -> 14 -> 15 -> 16 -> 附录模板 | 交付模式、接管标准、行业案例、组织能力、长期价值 |
-
-## 相关图书
-
-- [Docker 从入门到实践](https://yeasy.gitbook.io/docker_practice/)：补齐容器、镜像、Compose、Kubernetes 等运行底座。
-- [大模型提示词工程指南](https://yeasy.gitbook.io/prompt_engineering_guide/)：补齐提示设计、任务拆解和提示评测基础。
-- [大模型上下文工程权威指南](https://yeasy.gitbook.io/context_engineering_guide/)：补齐 RAG、记忆、工具调用和上下文管理。
-- [智能体 Harness 工程指南](https://yeasy.gitbook.io/harness_engineering_guide/)：补齐 Agent 运行时、工具层、记忆、安全和可观测性。
-- [大模型安全权威指南](https://yeasy.gitbook.io/ai_security_guide/)：补齐提示注入、数据泄露、模型滥用和 AI 系统治理。
+</details>
 
 ## 全书结构
 
-全书分为四部分，共十六章，另设附录。
+- **入门篇 · 理解 FDE（第 1–4 章）** · 先读[FDE 的角色边界](01_role/README.md)，再学习现场问题发现、架构取舍和交付协作。
+- **工程篇 · 云原生与自动化交付（第 5–8 章）** · 从[云原生运行底座](05_cloud_native/README.md)入手，学习 Kubernetes、GitOps、基础设施即代码、数据集成和安全合规。
+- **生产篇 · AI 原生系统（第 9–12 章）** · 先读[AI 原生 FDE](09_ai_native/README.md)，学习如何将 LLM、RAG 和 Agent 接入业务工作流，用评测与可观测性支持上线和现场运维。
+- **实战篇 · 规模化与行业落地（第 13–16 章）** · 从[工具生态与平台化](13_tooling/README.md)入手，结合金融、制造、医疗等行业案例，理解交付能力如何通过平台和组织复用。
 
-第一部分“入门篇：理解 FDE”建立基本概念。它解释 FDE 的来源、角色边界、现场问题发现、架构取舍和交付协作。
+附录提供[术语表](appendix/glossary.md)、[参考文献](appendix/references.md)、[工具索引](appendix/tools.md)、[交付证据包模板](appendix/templates.md)、[综合实战](appendix/capstone.md)、[第十四章声明账本](appendix/claim_ledger.md)和[快变事实核验表](appendix/volatile_facts.md)。
 
-第二部分“工程篇：云原生与自动化交付”讲生产化所需的基础能力。它覆盖云原生运行环境、自动化交付、数据集成、安全合规和治理。
+## 延伸阅读
 
-第三部分“生产篇：AI 原生系统”聚焦企业 AI 落地。它讲解 LLM 应用、RAG、Agent、评测、LLMOps、从原型到生产系统以及现场运维。
+- **容器、镜像和 Kubernetes** · [Docker 从入门到实践](https://yeasy.gitbook.io/docker_practice/)
+- **任务拆解、提示词设计和评测** · [大模型提示词工程指南](https://yeasy.gitbook.io/prompt_engineering_guide/)
+- **RAG、记忆与上下文管理** · [大模型上下文工程权威指南](https://yeasy.gitbook.io/context_engineering_guide/)
+- **Agent 运行时、工具层和可观测性** · [智能体 Harness 工程指南](https://yeasy.gitbook.io/harness_engineering_guide/)
+- **提示注入、数据泄露和 AI 治理** · [大模型安全权威指南](https://yeasy.gitbook.io/ai_security_guide/)
 
-第四部分“实战篇：规模化与行业落地”讨论如何把一次交付变成可复用能力。它包括工具生态、行业案例、组织能力、职业发展和未来趋势。
+## 反馈与贡献
 
-附录包括术语表、参考文献、工具索引、[交付证据包模板](appendix/templates.md)、[综合实战](appendix/capstone.md)、[第十四章声明账本](appendix/claim_ledger.md)和[快变事实核验表](appendix/volatile_facts.md)，便于读者在阅读、审校和项目实践中快速查阅、验证与复用。
+欢迎在 [GitHub Issues](https://github.com/yeasy/forward_deployed_engineering_guide/issues) 报告勘误或提出建议，也可以[提交 Pull Request](https://github.com/yeasy/forward_deployed_engineering_guide/pulls)。
 
-## 在线阅读
+<details>
 
-可通过 GitBook 阅读在线版本：[前线部署工程实践指南](https://yeasy.gitbook.io/forward_deployed_engineering_guide/)。
+<summary>本地预览与构建</summary>
 
-## 下载离线版本
-
-正式 PDF 版本可前往 [GitHub Releases](https://github.com/yeasy/forward_deployed_engineering_guide/releases/latest) 页面下载。
-
-默认分支自动更新的预览版可直接下载 [PDF](https://github.com/yeasy/forward_deployed_engineering_guide/releases/download/preview-pdf/forward_deployed_engineering_guide.pdf)、[单文件 HTML](https://github.com/yeasy/forward_deployed_engineering_guide/releases/download/preview-pdf/forward_deployed_engineering_guide.html)和 [SHA256SUMS](https://github.com/yeasy/forward_deployed_engineering_guide/releases/download/preview-pdf/SHA256SUMS)。这些文件会随主线更新覆盖，不代表正式发布版本；正式 tag 版本另带构建来源证明。
-
-## 本地阅读与构建
-
-安装 mdPress：
+在仓库根目录安装并运行 [mdPress](https://github.com/yeasy/mdPress)，启动本地预览。
 
 ```bash
 brew tap yeasy/tap
 brew install mdpress
-```
-
-本地预览：
-
-```bash
 mdpress serve .
 ```
 
-检查 Markdown 链接和代码块围栏：
+检查 Markdown 链接与代码块围栏，并构建静态站点、PDF 和 ePub。
 
 ```bash
 python3 check_project_rules.py
-```
-
-构建静态站点、PDF 和 ePub：
-
-```bash
 mdpress build --format site,pdf,epub .
 ```
 
-生成严格的单文件 HTML（需要 Pandoc 3.5、Chrome 和 Node.js）：
+构建可离线阅读的单文件 HTML 需要 Pandoc 3.5、Chrome 和 Node.js。将 `CHROME_BIN` 设为本机 Chrome 可执行文件路径。
 
 ```bash
 PUPPETEER_SKIP_DOWNLOAD=true npm ci --prefix tools/mermaid --ignore-scripts
@@ -130,11 +90,17 @@ python3 tools/build_html_reader.py --book-dir . --title "前线部署工程实�
   --svg-dir /tmp/fde-mermaid --out forward_deployed_engineering_guide.html --strict
 ```
 
-## CI 与发布
+</details>
 
-本仓库配置 GitHub Actions：
+<details>
 
-- `CI`：在 `main` 分支推送、Pull Request 和手动触发时运行测试与项目检查，构建并验证 PDF、单文件 HTML 和校验和。
-- `Update Preview Publications`：先在只读构建任务中生成并验证 PDF、HTML 和校验和，再由独立写入任务更新 `preview-pdf` 预览 Release。
-- `Auto Release`：在 `v*` tag 推送时构建 PDF、HTML 和校验和，由独立发布任务生成构建来源证明并上传 GitHub Release；手动触发只生成验证后的 artifact，不写正式 Release。
-- `Dependabot auto-merge`：仅对 GitHub Actions 的低风险补丁和小版本更新启用自动合并，且要求目标分支已配置必需检查。
+<summary>预览版、持续集成与发布</summary>
+
+默认分支的预览版随主线更新，提供 [PDF](https://github.com/yeasy/forward_deployed_engineering_guide/releases/download/preview-pdf/forward_deployed_engineering_guide.pdf)、[单文件 HTML](https://github.com/yeasy/forward_deployed_engineering_guide/releases/download/preview-pdf/forward_deployed_engineering_guide.html)和 [SHA256SUMS](https://github.com/yeasy/forward_deployed_engineering_guide/releases/download/preview-pdf/SHA256SUMS)。正式版本另带构建来源证明。
+
+- `CI` 在推送到 `main`、提交 Pull Request 或手动触发时运行测试和项目检查，并构建、验证 PDF、单文件 HTML 和校验和。
+- `Update Preview Publications` 在只读任务中构建并验证 PDF、HTML 和校验和，再由独立任务发布到 `preview-pdf`。
+- `Auto Release` 在推送 `v*` 标签时构建 PDF、HTML 和校验和，再由独立任务生成构建来源证明并发布到 GitHub Releases。手动触发仅生成验证后的构建产物。
+- `Dependabot auto-merge` 仅对 GitHub Actions 的低风险补丁和小版本更新启用自动合并，要求目标分支已配置必需检查。
+
+</details>
