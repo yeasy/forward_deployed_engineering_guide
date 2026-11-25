@@ -134,9 +134,23 @@ class ReleaseWorkflowTests(unittest.TestCase):
             self.assertNotIn("continue-on-error: true", text)
         package = json.loads((ROOT / "tools/mermaid/package.json").read_text(encoding="utf-8"))
         lock = json.loads((ROOT / "tools/mermaid/package-lock.json").read_text(encoding="utf-8"))
-        pinned = package["dependencies"]["@mermaid-js/mermaid-cli"]
-        self.assertRegex(pinned, r"^\d+\.\d+\.\d+$", "mermaid-cli must be pinned to an exact version")
-        self.assertEqual(lock["packages"][""]["dependencies"]["@mermaid-js/mermaid-cli"], pinned)
+        dependency = "@mermaid-js/mermaid-cli"
+        pinned = package["dependencies"][dependency]
+        self.assertIsNotNone(
+            re.fullmatch(r"(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)", pinned),
+            "mermaid-cli must be pinned to an exact version",
+        )
+        self.assertGreaterEqual(lock["lockfileVersion"], 3)
+        self.assertEqual(
+            lock["packages"][""]["dependencies"][dependency],
+            pinned,
+            "lockfile root dependency must match package.json",
+        )
+        self.assertEqual(
+            lock["packages"][f"node_modules/{dependency}"]["version"],
+            pinned,
+            "resolved mermaid-cli version must match package.json",
+        )
 
     def test_release_is_attested_and_write_permissions_are_isolated(self):
         auto = self.text("auto-release.yml")
